@@ -4,6 +4,10 @@
 
 **A local VS Code dashboard that reads your codebase and explains it back to you — in plain language, grounded in your real code.**
 
+[Download the latest VSIX](https://simpleecode.netlify.app/download) ·
+[Visit the website](https://simpleecode.netlify.app) ·
+[Read the changelog](CHANGELOG.md)
+
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Built with AI](https://img.shields.io/badge/Built%20with-AI-blueviolet)
 ![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-007ACC)
@@ -58,8 +62,9 @@ and you get to verify.
 
 Four steps to your first explanation.
 
-1. **Install the extension.** In VS Code: Extensions view → `···` menu →
-   **Install from VSIX…** → pick `simpleecode-0.1.0.vsix`.
+1. **Install the extension.** [Download the latest VSIX](https://simpleecode.netlify.app/download),
+   then in VS Code open the Extensions view → `···` menu →
+   **Install from VSIX…** → pick the downloaded file.
    (Or build it yourself with `npm install && npm run package`.)
 2. **Install the ACP agent** so answers stream back live:
    `npm i -g @zed-industries/claude-code-acp`.

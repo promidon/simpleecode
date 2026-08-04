@@ -294,7 +294,12 @@
     "lint": "eslint src",
     "dead-code": "fallow --no-cache dead-code",
     "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
-    "package": "vsce package"
+    "package": "vsce package",
+    "release:prepare": "./scripts/release.sh prepare",
+    "release:verify": "./scripts/release.sh verify",
+    "release:github": "./scripts/release.sh github-release",
+    "deploy:preview": "./scripts/release.sh deploy-preview",
+    "deploy:production": "./scripts/release.sh deploy-production"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",

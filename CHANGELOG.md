@@ -7,6 +7,23 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-08-04
+
+First public beta of SimpleeCode.
+
+### Added
+
+- Deterministic file and symbol indexes with a persisted module graph.
+- Language-server facts with a self-parsing floor for unsupported targets.
+- Plain-language explanations, codebase tours, and answer verification with
+  click-through file and line references.
+- Privacy review, blocked-file rules, secret redaction, and size limits before
+  prompts leave the machine.
+- A checksum-verified, user-triggered VSIX updater. Startup checks remain off
+  by default.
+- Public contribution, roadmap, security, conduct, release, and distribution
+  documentation.
+
 ### Changed
 
 - **Renamed from CodeLens to SimpleeCode.** The old name collides with a
@@ -15,31 +32,6 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   This is a clean break — old setting keys are not read as a fallback, and the
   local index is rebuilt from scratch on first launch.
 - **Relicensed from MIT to GPL-3.0-or-later.**
-
-### Added
-
-- `CONTRIBUTING.md`, `ROADMAP.md`, `SECURITY.md`, and a code of conduct for the
-  public repository.
-
-## [0.1.0] — 2026-07-08
-
-First packaged build, shared as a private beta.
-
-### Added
-
-- Deterministic file index, symbol index, and a persisted module graph.
-- Verified facts layer: language-server facts with a self-parsing floor for
-  targets the language server can't see.
-- Deterministic file summaries and sparse TF-IDF search (off by default, behind
-  `simpleecode.retrieval.enableSparseSearch`).
-- Structured prompt packets, and answers streamed from a spawned ACP agent.
-- Answer verification against the sent facts, with click-through `file:line`
-  links on every grounded claim.
-- Codebase tour that walks files in dependency order.
-- Privacy guard with a full pre-send review, blocked-file globs, secret
-  redaction, and oversized-file truncation.
-- Swift and Apple documentation links, resolved deterministically.
-- Dashboard rendered in Atkinson Hyperlegible, built for readability.
 
 [Unreleased]: https://github.com/promidon/simpleecode/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/promidon/simpleecode/releases/tag/v0.1.0
