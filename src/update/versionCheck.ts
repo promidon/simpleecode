@@ -4,6 +4,8 @@
  * (`UpdateChecker.ts`) only loads the manifest and shows the notification.
  */
 
+const STABLE_VERSION = /^\d+\.\d+\.\d+$/;
+
 /** Compare two semver-ish versions: -1 (a < b), 0 (equal), 1 (a > b). */
 export function compareVersions(a: string, b: string): -1 | 0 | 1 {
   const pa = parts(a);
@@ -31,9 +33,11 @@ function parts(version: string): number[] {
 export function versionFromManifest(jsonText: string): string | undefined {
   try {
     const value = JSON.parse(jsonText) as { version?: unknown };
-    return typeof value.version === 'string' && /\d/.test(value.version)
-      ? value.version
-      : undefined;
+    if (typeof value.version !== 'string') {
+      return undefined;
+    }
+    const version = value.version.trim();
+    return STABLE_VERSION.test(version) ? version : undefined;
   } catch {
     return undefined;
   }

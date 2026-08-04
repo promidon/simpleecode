@@ -7,6 +7,8 @@
   "entry": [
     "src/test/**/*.test.ts",     // run by `node --test out/test/**` (package.json "test")
     "netlify/functions/**/*.js", // HTTP serverless entry points (netlify.toml)
+    "scripts/**/*.mjs",          // release helpers invoked by scripts/release.sh
+    "site/**",                   // static website copied into publish/ for Netlify
     "media/**",                  // webview assets loaded via asWebviewUri (src/dashboard/webviewHtml.ts)
     "docs/design/VS Code extension UI design/support.js" // generated runtime loaded by SimpleeCode.dc.html
   ],

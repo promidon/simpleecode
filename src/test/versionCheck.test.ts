@@ -21,6 +21,13 @@ test('versionFromManifest reads package.json, fails soft on junk', () => {
   assert.equal(versionFromManifest('not json'), undefined);
   assert.equal(versionFromManifest('{"name": "x"}'), undefined);
   assert.equal(versionFromManifest('{"version": "unversioned"}'), undefined);
+  assert.equal(versionFromManifest('{"version": "1.0"}'), undefined);
+  assert.equal(versionFromManifest('{"version": "v1.0.0"}'), undefined);
+  assert.equal(versionFromManifest('{"version": "1.0.0-beta.1"}'), undefined);
+  assert.equal(
+    versionFromManifest(JSON.stringify({ version: '1.0.0"; touch /tmp/simpleecode' })),
+    undefined,
+  );
 });
 
 test('decideUpdate: newer source → update; equal/older/unreadable → silent', () => {

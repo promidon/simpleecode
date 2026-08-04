@@ -1,10 +1,11 @@
-# Netlify config for the SimpleeCode beta backend.
+# Netlify config for the SimpleeCode website, update feed, and feedback function.
 #   - /.netlify/functions/feedback  → receives in-extension feedback and commits
 #     it as docs/feedback/<slug>--<date>.md to a separate private feedback repo.
 #   - the published site root also hosts the update feed: latest.json + the .vsix
 #     (copied into publish/ by scripts/release.sh before `netlify deploy`).
 #
-# Required environment variables (set in Netlify UI → Site settings → Env vars):
+# Required environment variables for feedback only. The website and updater do
+# not require secrets.
 #   GITHUB_TOKEN    fine-grained PAT, Contents:write on ONLY the simpleecode repo
 #   GITHUB_REPO     owner/private-feedback-repo (never the public source repo)
 #   FEEDBACK_TOKEN  shared secret the extension sends in the x-simpleecode-token header
@@ -18,3 +19,28 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Permissions-Policy = "camera=(), geolocation=(), microphone=()"
+
+[[headers]]
+  for = "/latest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/*.vsix"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

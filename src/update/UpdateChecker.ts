@@ -93,7 +93,7 @@ export class UpdateChecker {
       'Later',
     );
     if (choice === 'Update now') {
-      await this.runUpdate(asset.url, decision.latest, asset.sha256, source);
+      await this.runUpdate(asset.url, asset.sha256, source);
     }
   }
 
@@ -130,7 +130,6 @@ export class UpdateChecker {
    */
   private async runUpdate(
     url?: string,
-    version?: string,
     sha256?: string,
     source?: string,
   ): Promise<void> {
@@ -161,7 +160,7 @@ export class UpdateChecker {
         );
         return;
       }
-      await this.installVsix(url, version, sha256);
+      await this.installVsix(url, sha256);
       return;
     }
 
@@ -173,12 +172,11 @@ export class UpdateChecker {
   /** Download the release .vsix and install it with the `code` CLI. */
   private async installVsix(
     url: string,
-    version: string | undefined,
     expectedSha256: string,
   ): Promise<void> {
-    const target = vscode.Uri.file(
-      `${os.tmpdir()}/simpleecode-${version ?? 'latest'}.vsix`,
-    );
+    // The manifest version is display text only. Keep remote input out of the
+    // filesystem path and the terminal command used for installation.
+    const target = vscode.Uri.file(`${os.tmpdir()}/simpleecode-update.vsix`);
     try {
       const res = await fetch(url, {
         signal: AbortSignal.timeout(60_000),

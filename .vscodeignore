@@ -22,8 +22,11 @@ netlify.toml
 .netlify/**
 publish/**
 scripts/**
+site/**
 deno.lock
 *.vsix
+AGENTS.md
+CLAUDE.md
 ROADMAP.md
 CODE_OF_CONDUCT.md
 SECURITY.md
