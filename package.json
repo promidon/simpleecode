@@ -1,0 +1,309 @@
+{
+  "name": "simpleecode",
+  "displayName": "SimpleeCode",
+  "description": "SimpleeCode is a local VS Code extension that explains your codebase in plain language, grounded in your actual code.",
+  "version": "0.1.0",
+  "publisher": "promidon",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/promidon/simpleecode.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "Education",
+    "Machine Learning"
+  ],
+  "keywords": [
+    "codebase",
+    "explain",
+    "rag",
+    "acp",
+    "claude"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "simpleecode",
+          "title": "SimpleeCode",
+          "icon": "media/simpleecode-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "simpleecode": [
+        {
+          "id": "simpleecode.sidebar",
+          "name": "SimpleeCode",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "simpleecode.openDashboard",
+        "title": "SimpleeCode: Open Dashboard"
+      },
+      {
+        "command": "simpleecode.explainSelection",
+        "title": "SimpleeCode: Explain Selection"
+      },
+      {
+        "command": "simpleecode.explainFunction",
+        "title": "SimpleeCode: Explain Enclosing Function"
+      },
+      {
+        "command": "simpleecode.explainCurrentFile",
+        "title": "SimpleeCode: Explain Current File"
+      },
+      {
+        "command": "simpleecode.summarizeCurrentFile",
+        "title": "SimpleeCode: Summarize Current File"
+      },
+      {
+        "command": "simpleecode.explainSystemRole",
+        "title": "SimpleeCode: Explain System Role"
+      },
+      {
+        "command": "simpleecode.cancelPrompt",
+        "title": "SimpleeCode: Stop the Current Answer"
+      },
+      {
+        "command": "simpleecode.startTour",
+        "title": "SimpleeCode: Start Codebase Tour"
+      },
+      {
+        "command": "simpleecode.newConversation",
+        "title": "SimpleeCode: New Conversation"
+      },
+      {
+        "command": "simpleecode.explainBeginner",
+        "title": "SimpleeCode: Explain (Beginner mode)"
+      },
+      {
+        "command": "simpleecode.explainDetailed",
+        "title": "SimpleeCode: Explain (Detailed mode)"
+      },
+      {
+        "command": "simpleecode.explainDebug",
+        "title": "SimpleeCode: Explain (Debug mode)"
+      },
+      {
+        "command": "simpleecode.reindexWorkspace",
+        "title": "SimpleeCode: Reindex Workspace"
+      },
+      {
+        "command": "simpleecode.setupSwiftEngine",
+        "title": "SimpleeCode: Set Up Swift Engine (Xcode)"
+      },
+      {
+        "command": "simpleecode.checkForUpdates",
+        "title": "SimpleeCode: Check for Updates"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "simpleecode.explainSelection",
+          "when": "editorHasSelection",
+          "group": "simpleecode@1"
+        },
+        {
+          "command": "simpleecode.explainFunction",
+          "when": "editorTextFocus",
+          "group": "simpleecode@2"
+        },
+        {
+          "command": "simpleecode.explainCurrentFile",
+          "group": "simpleecode@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "SimpleeCode",
+      "properties": {
+        "simpleecode.acp.transport": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "agent",
+            "commands"
+          ],
+          "enumDescriptions": [
+            "Use the spawned ACP agent when its command is on PATH; otherwise fall back to the vscode-acp extension commands.",
+            "Always spawn the ACP agent process (real delivery; answers stream into the dashboard).",
+            "Always use the vscode-acp extension commands (clipboard safety net)."
+          ],
+          "default": "auto",
+          "description": "How SimpleeCode talks to Claude Code."
+        },
+        "simpleecode.acp.agentCommand": {
+          "type": "string",
+          "default": "claude-code-acp",
+          "markdownDescription": "Command that starts the ACP agent process. Default is `claude-code-acp` (`npm i -g @zed-industries/claude-code-acp`)."
+        },
+        "simpleecode.acp.agentArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra arguments passed to the ACP agent command."
+        },
+        "simpleecode.acp.environmentVariables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Additional environment variable names to pass to the ACP agent. SimpleeCode passes only a minimal non-secret environment by default; add a name here only when the agent explicitly requires it."
+        },
+        "simpleecode.acp.extensionId": {
+          "type": "string",
+          "default": "formulahendry.acp-client",
+          "markdownDescription": "Extension id of the installed ACP / Claude Code transport extension (`vscode-acp`). Used for availability detection and the install hint. The marketplace build of `formulahendry/vscode-acp` is `formulahendry.acp-client`; the Open VSX build is `omercnet.vscode-acp`."
+        },
+        "simpleecode.acp.commands.openChat": {
+          "type": "string",
+          "default": "acp.openChat",
+          "description": "Command id used to open the ACP chat panel."
+        },
+        "simpleecode.acp.commands.sendPrompt": {
+          "type": "string",
+          "default": "acp.sendPrompt",
+          "description": "Command id used to send a prompt to the ACP agent."
+        },
+        "simpleecode.acp.commands.newConversation": {
+          "type": "string",
+          "default": "acp.newConversation",
+          "description": "Command id used to start a new ACP conversation."
+        },
+        "simpleecode.acp.sendStrategy": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "command",
+            "clipboard"
+          ],
+          "enumDescriptions": [
+            "Try to pass the prompt to the ACP send command; if that is not supported, fall back to copying the prompt to the clipboard and opening the chat panel.",
+            "Only call the ACP send command (best when the command accepts a prompt argument).",
+            "Always copy the prompt to the clipboard and open the chat panel for manual paste."
+          ],
+          "default": "auto",
+          "description": "How SimpleeCode hands a built prompt to the ACP transport."
+        },
+        "simpleecode.updates.checkOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "Opt in to an HTTPS update check when the window opens. Off by default to preserve local-first startup."
+        },
+        "simpleecode.updates.source": {
+          "type": "string",
+          "default": "https://simpleecode.netlify.app/latest.json",
+          "markdownDescription": "Where the latest version lives: an https URL to a `latest.json` (`{version, url, sha256, notes}`) or a repo `package.json`. Automatic VSIX installation requires a same-origin HTTPS URL and matching SHA-256. Empty disables the check."
+        },
+        "simpleecode.updates.updateCommand": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Shell command run in a terminal when you click **Update now** (e.g. pull the repo, `npm run compile`, package and install the `.vsix`). Empty shows manual instructions instead."
+        },
+        "simpleecode.feedback.endpoint": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "URL of the SimpleeCode feedback function (e.g. `https://<site>.netlify.app/.netlify/functions/feedback`). Set by the beta owner. Feedback you send goes only here."
+        },
+        "simpleecode.feedback.token": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Shared secret that authorizes sending feedback (must match the server's `FEEDBACK_TOKEN`). Provided by the beta owner."
+        },
+        "simpleecode.feedback.tester": {
+          "type": "string",
+          "default": "",
+          "description": "Your name or handle, attached to feedback you send so the team knows who reported it. Leave empty to stay anonymous."
+        },
+        "simpleecode.privacy.defaultScope": {
+          "type": "string",
+          "enum": [
+            "selection_only",
+            "current_file",
+            "related_files",
+            "system_context"
+          ],
+          "default": "current_file",
+          "description": "Maximum context SimpleeCode may include. Explicit selection and file commands stay narrower; broader system-role work is capped here."
+        },
+        "simpleecode.privacy.showPromptBeforeSending": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a confirmation preview of exactly what will be sent to Claude before sending."
+        },
+        "simpleecode.privacy.maxFileBytes": {
+          "type": "number",
+          "default": 200000,
+          "description": "Maximum bytes of file content included in a packet. Larger files are truncated with a marker."
+        },
+        "simpleecode.privacy.redactSecrets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Redact lines that look like secrets (api keys, tokens, passwords, private keys) before sending."
+        },
+        "simpleecode.privacy.blockedFileGlobs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/.env",
+            "**/.env.*",
+            "**/*.pem",
+            "**/*.key",
+            "**/*.p12",
+            "**/*.pfx",
+            "**/id_rsa",
+            "**/id_dsa",
+            "**/secrets/**",
+            "**/*.secret",
+            "**/*credentials*"
+          ],
+          "description": "Files matching these globs are never sent to Claude."
+        },
+        "simpleecode.retrieval.enableSparseSearch": {
+          "type": "boolean",
+          "default": false,
+          "description": "Roadmap gate for deterministic sparse search across indexed summaries and symbols. Off by default; direct imports, declarations, and tests still retrieve under related-files scopes."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "typecheck": "tsc --noEmit -p ./",
+    "lint": "eslint src",
+    "dead-code": "fallow --no-cache dead-code",
+    "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@vscode/vsce": "^3.2.0",
+    "@types/node": "^22.7.0",
+    "@types/vscode": "^1.90.0",
+    "eslint": "^9.13.0",
+    "fallow": "2.45.1",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.10.0"
+  }
+}

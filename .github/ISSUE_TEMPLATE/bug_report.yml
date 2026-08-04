@@ -1,0 +1,64 @@
+name: Bug report
+description: Something in SimpleeCode doesn't work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this.
+
+        **Please don't paste secrets, tokens, or private source code.** If
+        reproducing it needs private code, describe the shape of it instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        1. I selected ...
+        2. I ran "SimpleeCode: Explain Selection"
+        3. I expected ... but it ...
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: What language and kind of project?
+      placeholder: TypeScript, a React app with about 200 files
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: SimpleeCode version and VS Code version
+      placeholder: SimpleeCode 0.1.0, VS Code 1.90.2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS, Windows, Linux, Other]
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output channel
+      description: >
+        Anything from View → Output → SimpleeCode. Check it for file paths you'd
+        rather not share before pasting.
+      render: text
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before you submit
+      options:
+        - label: I've checked this report contains no secrets or private source.
+          required: true

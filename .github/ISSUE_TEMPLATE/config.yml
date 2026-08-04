@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Privacy or security problem
+    url: https://github.com/promidon/simpleecode/security/advisories/new
+    about: Report privately instead — please don't open a public issue.
+  - name: Something from the roadmap
+    url: https://github.com/promidon/simpleecode/blob/main/ROADMAP.md
+    about: Planned work, and the 🟢 items that are good places to start.

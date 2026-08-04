@@ -1,0 +1,18 @@
+node_modules/
+out/
+*.vsix
+.vscode-test/
+.DS_Store
+.simpleecode/
+.fallow/
+publish/
+deno.lock
+
+# Local Netlify folder
+.netlify
+
+# Local working notes and internal history — never published.
+# _admin/ holds planning docs, beta artifacts, and design exports that were
+# pulled out of the public repo. Local-only on purpose: keep it, don't ship it.
+_admin/
+docs/rename-audit.md

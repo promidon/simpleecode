@@ -1,0 +1,50 @@
+{
+  // Roots that are reachable from outside the extension's import graph, so
+  // fallow should treat them as used. Without these, tests, the serverless
+  // function, and webview assets are flagged unused-file, and anything used
+  // only by a test is wrongly flagged as an unused export/type.
+  // Docs: https://docs.fallow.tools/configuration/overview
+  "entry": [
+    "src/test/**/*.test.ts",     // run by `node --test out/test/**` (package.json "test")
+    "netlify/functions/**/*.js", // HTTP serverless entry points (netlify.toml)
+    "media/**",                  // webview assets loaded via asWebviewUri (src/dashboard/webviewHtml.ts)
+    "docs/design/VS Code extension UI design/support.js" // generated runtime loaded by SimpleeCode.dc.html
+  ],
+
+  // These methods are invoked through typed extension/framework contracts.
+  // Scope each rule to its interface so genuinely unused methods still fail.
+  "usedClassMembers": [
+    {
+      "implements": "AcpChatAdapter",
+      "members": ["sendPrompt", "cancel", "newConversation"]
+    },
+    {
+      "implements": "AcpTransportAdapter",
+      "members": ["sendPrompt", "describeAvailability"]
+    },
+    {
+      "implements": "vscode.WebviewViewProvider",
+      "members": ["resolveWebviewView"]
+    },
+    {
+      "implements": "FileIndexService",
+      "members": ["load", "reindex", "startWatching", "get"]
+    },
+    {
+      "implements": "SymbolIndexService",
+      "members": ["load", "reindexWorkspace", "findDeclaration", "all"]
+    },
+    {
+      "implements": "Retriever",
+      "members": ["retrieve"]
+    },
+    {
+      "implements": "LocalStore",
+      "members": ["close"]
+    },
+    {
+      "implements": "vscode.Disposable",
+      "members": ["dispose"]
+    }
+  ]
+}

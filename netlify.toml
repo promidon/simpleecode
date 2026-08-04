@@ -1,0 +1,20 @@
+# Netlify config for the SimpleeCode beta backend.
+#   - /.netlify/functions/feedback  → receives in-extension feedback and commits
+#     it as docs/feedback/<slug>--<date>.md to a separate private feedback repo.
+#   - the published site root also hosts the update feed: latest.json + the .vsix
+#     (copied into publish/ by scripts/release.sh before `netlify deploy`).
+#
+# Required environment variables (set in Netlify UI → Site settings → Env vars):
+#   GITHUB_TOKEN    fine-grained PAT, Contents:write on ONLY the simpleecode repo
+#   GITHUB_REPO     owner/private-feedback-repo (never the public source repo)
+#   FEEDBACK_TOKEN  shared secret the extension sends in the x-simpleecode-token header
+# Optional:
+#   GITHUB_BRANCH   default: main
+#   FEEDBACK_DIR    default: docs/feedback
+
+[build]
+  publish = "publish"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"

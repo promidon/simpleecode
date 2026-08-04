@@ -1,0 +1,50 @@
+name: Wrong or unverified explanation
+description: SimpleeCode explained something incorrectly, or a claim wasn't caught by verification.
+labels: ["explanation-quality"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful kind of report this project gets. The whole
+        premise is that answers are checkable — so an answer that was wrong
+        *and looked confident* is a real defect, not just a bad day for the AI.
+
+        **Don't paste private source.** A reduced example is better anyway.
+
+  - type: textarea
+    id: claim
+    attributes:
+      label: What did it say?
+      description: The specific claim that was wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: truth
+    attributes:
+      label: What's actually true?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: flagged
+    attributes:
+      label: Was the claim flagged as unverified?
+      options:
+        - "No — it was shown as grounded"
+        - "Yes — it was flagged, but the answer was still confusing"
+        - "I'm not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Smallest code that reproduces it
+      render: text
+
+  - type: input
+    id: mode
+    attributes:
+      label: Which command and mode?
+      placeholder: Explain Selection, Beginner mode

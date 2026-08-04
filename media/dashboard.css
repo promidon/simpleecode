@@ -1,0 +1,1365 @@
+/* SimpleeCode dashboard — redesign (docs/design/redesign-plan.md).
+   Colour = brand palette (light default; dark/high-contrast keyed off the
+   vscode-* body classes VS Code sets on the webview). Geometry & chrome
+   (radius, focus, inputs) inherit VS Code via --vscode-* with fallbacks. */
+
+/* Atkinson Hyperlegible — bundled locally (SIL OFL 1.1). The readable default
+   for SimpleeCode (dyslexia-friendly). */
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/atkinson-hyperlegible-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('fonts/atkinson-hyperlegible-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/atkinson-hyperlegible-latin-400-italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('fonts/atkinson-hyperlegible-latin-700-italic.woff2') format('woff2');
+}
+
+/* --- Brand colour palette (light) --------------------------------------- */
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #fafafa;
+  --elev: #ffffff;
+  --text: #1d1d1f;
+  --text-2: #6e6e73;
+  /* --text-3 carries small info labels (fact-label, hints), so it must clear
+     WCAG 1.4.3 (4.5:1) on --bg — darker than the mockup's decorative #98989d. */
+  --text-3: #6b6b70;
+  --border: rgba(0, 0, 0, 0.09);
+  --border-2: rgba(0, 0, 0, 0.16);
+  --ok: #1f7a34;
+  --ok-bg: rgba(31, 122, 52, 0.12);
+  --warn: #8a5300;
+  --warn-bg: rgba(180, 110, 0, 0.14);
+  --code-bg: #f4f4f6;
+  --accent: #005fb8;
+  --accent-fill: #005fb8;
+  --accent-on: #ffffff;
+  --accent-tint: rgba(0, 95, 184, 0.12);
+  --accent-tint-2: rgba(0, 95, 184, 0.07);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-pop: 0 10px 34px rgba(0, 0, 0, 0.16);
+
+  /* Geometry inherits VS Code where it exists, with calm fallbacks. */
+  --radius: 10px;
+  --radius-sm: 7px;
+  --pad: 14px;
+  --gap: 12px;
+}
+
+/* Dark brand palette — VS Code stamps `vscode-dark` on <body>. */
+body.vscode-dark {
+  --bg: #0e0e10;
+  --surface: #1c1c1e;
+  --surface-2: #232326;
+  --elev: #2a2a2d;
+  --text: #f5f5f7;
+  --text-2: #a1a1a6;
+  --text-3: #949499;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-2: rgba(255, 255, 255, 0.2);
+  --ok: #34d058;
+  --ok-bg: rgba(52, 208, 88, 0.16);
+  --warn: #ffd426;
+  --warn-bg: rgba(255, 212, 38, 0.13);
+  --code-bg: #161618;
+  --accent: #75baff;
+  --accent-fill: #0067c5;
+  --accent-on: #ffffff;
+  --accent-tint: rgba(117, 186, 255, 0.16);
+  --accent-tint-2: rgba(117, 186, 255, 0.09);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 14px 44px rgba(0, 0, 0, 0.6);
+}
+
+/* High-contrast — lean on VS Code's own high-contrast foreground/borders so
+   the calm palette never drops below the HC floor. Refined in Phase 6. */
+body.vscode-high-contrast {
+  --border: var(--vscode-contrastBorder, rgba(255, 255, 255, 0.6));
+  --border-2: var(--vscode-contrastBorder, rgba(255, 255, 255, 0.8));
+  --text-2: var(--vscode-foreground, #fff);
+  --text-3: var(--vscode-foreground, #fff);
+  --accent: var(--vscode-textLink-foreground, #75baff);
+  --accent-fill: var(--vscode-button-background, #0067c5);
+  --accent-on: var(--vscode-button-foreground, #fff);
+}
+body.vscode-high-contrast-light {
+  --border: var(--vscode-contrastBorder, rgba(0, 0, 0, 0.6));
+  --border-2: var(--vscode-contrastBorder, rgba(0, 0, 0, 0.8));
+  --text-2: var(--vscode-foreground, #000);
+  --text-3: var(--vscode-foreground, #000);
+  --accent: var(--vscode-textLink-foreground, #005fb8);
+  --accent-fill: var(--vscode-button-background, #005fb8);
+  --accent-on: var(--vscode-button-foreground, #fff);
+}
+
+/* --- Base --------------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Atkinson Hyperlegible', var(--vscode-font-family), system-ui, sans-serif;
+  font-size: var(--vscode-font-size, 13px);
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--code-bg);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  font-size: 0.92em;
+  margin: 8px 0;
+}
+
+code {
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.92em;
+}
+
+.muted {
+  color: var(--text-2);
+}
+
+/* Focus visibility (WCAG 2.2 SC 2.4.7 / 2.4.11) — one consistent ring. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --- Shell + header ----------------------------------------------------- */
+/* `height`, not `min-height`: the shell must be exactly the viewport so the
+   answer scrolls inside .explain-scroll and the composer stays pinned. With
+   min-height a long answer grew the shell instead, pushing the ask box off
+   the bottom of the sidebar. */
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.brand-glyph {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.brand-name {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  margin-left: 4px;
+  border-radius: 999px;
+  font-size: 0.82em;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.status-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex: none;
+}
+
+.status-pill.is-ready::before {
+  background: var(--ok);
+}
+
+.status-pill.is-warn::before {
+  background: var(--warn);
+}
+
+.status-pill:empty {
+  display: none;
+}
+
+/* Tab bar */
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.tab {
+  padding: 5px 14px;
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 0.92em;
+  min-height: 24px;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.is-active {
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.overflow {
+  position: relative;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+}
+
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 200px;
+  background: var(--elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-pop);
+  padding: 5px;
+  z-index: 10;
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.92em;
+}
+
+.menu button:hover {
+  background: var(--accent-tint);
+}
+
+/* --- Panels (tab content) ---------------------------------------------- */
+.panel {
+  display: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.panel.is-active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Context bar (Explain) --------------------------------------------- */
+.context-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88em;
+  color: var(--text-2);
+}
+
+.context-bar:empty {
+  display: none;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  font-size: 0.92em;
+}
+
+.preview-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--surface);
+  min-height: 24px;
+}
+
+.preview-btn:hover {
+  background: var(--surface-2);
+}
+
+/* --- Explain body (two columns) ---------------------------------------- */
+.explain-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  flex: 1;
+  min-height: 0;
+}
+
+.explain-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.explain-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 18px 20px;
+}
+
+.facts-rail {
+  border-left: 1px solid var(--border);
+  background: var(--surface-2);
+  overflow: auto;
+  padding: 16px;
+}
+
+.facts-rail:empty {
+  display: none;
+}
+
+/* The facts fold. Wide, it is an always-open heading over the card; narrow, it
+   collapses to a single summary row so the answer keeps the vertical space. */
+.facts-fold > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 6px;
+}
+
+.facts-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.facts-fold > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.facts-fold > summary .rail-title {
+  margin: 0;
+}
+
+/* Only meaningful when folded shut — names what is hidden. */
+.facts-summary-symbol {
+  font-size: 0.78em;
+  color: var(--accent);
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.facts-fold[open] > summary {
+  margin-bottom: 12px;
+}
+
+.facts-fold[open] .facts-summary-symbol {
+  display: none;
+}
+
+/* --- Composer (depth + ask) -------------------------------------------- */
+.composer {
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  background: var(--surface);
+}
+
+.composer-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.depth-label {
+  color: var(--text-2);
+  font-size: 0.85em;
+}
+
+.segmented {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+}
+
+.seg {
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 0.88em;
+  min-height: 24px;
+}
+
+.seg:hover {
+  color: var(--text);
+}
+
+.seg.is-active {
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  min-height: 24px;
+}
+
+.ghost-btn:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.new-btn {
+  margin-left: auto;
+}
+
+.ask {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.ask input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  color: var(--text);
+}
+
+.ask input::placeholder {
+  color: var(--text-3);
+}
+
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-fill);
+  color: var(--accent-on);
+  font-size: 1.1em;
+  flex: none;
+}
+
+.send-btn:hover {
+  filter: brightness(1.06);
+}
+
+/* --- Shared answer window (Explain / Tour / Check) --------------------- */
+.answer-window {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.answer-window.is-empty {
+  color: var(--text-2);
+}
+
+/* --- Empty states ------------------------------------------------------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 48px 24px;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.empty-state .empty-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.empty-state h2 {
+  margin: 0;
+  font-size: 1.3em;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--text-2);
+}
+
+/* --- Facts rail content ------------------------------------------------- */
+.rail-title {
+  font-size: 0.78em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  margin: 0 0 12px;
+}
+
+.fact-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.fact-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.fact-card-title {
+  font-weight: 700;
+}
+
+.fact-symbol {
+  color: var(--text-2);
+  font-size: 0.9em;
+}
+
+.fact-provenance {
+  margin: 0 0 14px;
+  font-size: 0.85em;
+  color: var(--text-2);
+}
+
+.fact-group {
+  margin-bottom: 16px;
+}
+
+.fact-label {
+  font-size: 0.72em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  margin-bottom: 3px;
+}
+
+.fact-value {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.fact-value code,
+.fact-value.mono {
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+}
+
+/* --- Cards / key-value / lists (shared) -------------------------------- */
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--pad);
+  margin-bottom: var(--gap);
+  box-shadow: var(--shadow-card);
+}
+
+.card h2 {
+  margin: 0 0 8px;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+
+.card-warn {
+  border-left: 3px solid var(--warn);
+}
+
+.card-warn h2 {
+  color: var(--warn);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1em;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.answer-head {
+  margin-bottom: 10px;
+}
+
+.answer-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.74em;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-2);
+}
+
+.answer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+}
+
+.answer {
+  word-break: break-word;
+}
+
+/* Inline citation + source links read as clickable chips. */
+.answer a[data-url],
+.claims a[data-open-source],
+.answer a[data-open-source] {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-size: 0.92em;
+  text-decoration: none;
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  min-height: 24px;
+}
+
+ul.links a,
+.tour-file a,
+.diagnostics summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.diagnostics summary {
+  cursor: pointer;
+}
+
+.answer a[data-url]:hover,
+.claims a[data-open-source]:hover,
+.answer a[data-open-source]:hover {
+  background: var(--accent-tint-2);
+  text-decoration: underline;
+}
+
+.answer > *:first-child {
+  margin-top: 0;
+}
+
+.answer > *:last-child {
+  margin-bottom: 0;
+}
+
+.answer h3 {
+  font-size: 1.02em;
+  margin: 16px 0 4px;
+}
+
+.answer h4 {
+  font-size: 0.96em;
+  margin: 12px 0 4px;
+}
+
+.answer p {
+  margin: 8px 0;
+}
+
+.answer blockquote {
+  margin: 10px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--border-2);
+  color: var(--text-2);
+}
+
+.explanation {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+
+.badge.ok {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+
+.badge.warn {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.check-summary {
+  margin: 12px 0;
+  color: var(--text-2);
+}
+
+.check-summary strong {
+  color: var(--text);
+}
+
+ul.links,
+ul.claims {
+  list-style: none;
+  padding-left: 0;
+  margin: 4px 0;
+}
+
+ul.links li,
+ul.claims li {
+  margin-bottom: 10px;
+}
+
+/* Claim rows (Check tab + Explain auto-verify) — a badge box beside the note. */
+.claim-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.claim-row .badge {
+  margin-top: 1px;
+  flex: none;
+}
+
+.claim-body {
+  min-width: 0;
+}
+
+.claim-main {
+  word-break: break-word;
+}
+
+.claim-note {
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+.claim-src {
+  margin-top: 6px;
+}
+
+/* --- Tour --------------------------------------------------------------- */
+.tour-scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 22px 24px;
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.tour-head {
+  margin-bottom: 18px;
+}
+
+.tour-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tour-title-row .panel-title {
+  margin: 0;
+}
+
+.tour-step {
+  color: var(--text-2);
+  font-size: 0.9em;
+}
+
+.progress {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.prog-seg {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border-2);
+}
+
+.prog-seg.is-done {
+  background: var(--accent);
+}
+
+.tour-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px;
+}
+
+.tour-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+
+.tour-file a {
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  font-weight: 700;
+}
+
+.lang-tag {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 0.8em;
+}
+
+.tour-summary {
+  margin: 0 0 8px;
+}
+
+.tour-why {
+  margin: 0 0 14px;
+  font-style: italic;
+  color: var(--text-2);
+}
+
+.tour-graph {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 20px;
+  margin: 0;
+}
+
+.tour-graph dt {
+  color: var(--text-2);
+  font-size: 0.9em;
+}
+
+.tour-graph dd {
+  margin: 0;
+  word-break: break-word;
+  font-size: 0.9em;
+}
+
+.tour-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.tour-end {
+  margin-left: auto;
+  border-color: transparent;
+  background: none;
+}
+
+.tour-hint {
+  margin: 12px 0 0;
+  color: var(--text-3);
+  font-size: 0.85em;
+}
+
+/* --- Check -------------------------------------------------------------- */
+.check-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 22px 24px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.panel-title {
+  margin: 0 0 4px;
+  font-size: 1.3em;
+}
+
+.panel-sub {
+  margin: 0 0 16px;
+  color: var(--text-2);
+}
+
+#check-input {
+  width: 100%;
+  resize: vertical;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  font-size: 0.92em;
+  margin-bottom: 12px;
+}
+
+.primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-fill);
+  color: var(--accent-on);
+  font-weight: 700;
+  min-height: 32px;
+}
+
+.primary-btn:hover {
+  filter: brightness(1.06);
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  filter: none;
+}
+
+/* --- Generic action buttons (tour controls etc.) ----------------------- */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.btn {
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  min-height: 32px;
+}
+
+.btn:hover {
+  background: var(--surface-2);
+}
+
+.btn.primary {
+  background: var(--accent-fill);
+  color: var(--accent-on);
+  border-color: transparent;
+}
+
+.btn.primary:hover {
+  filter: brightness(1.06);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* --- Streaming indicator ------------------------------------------------ */
+.streaming-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.streaming-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.streaming-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dot 1.2s infinite ease-in-out;
+}
+
+.streaming-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.streaming-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* --- Review-before-sending modal --------------------------------------- */
+.modal-root[hidden] {
+  display: none;
+}
+
+.modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow: auto;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.modal {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  background: var(--elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  padding: 18px 20px 20px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-shield {
+  display: inline-flex;
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.15em;
+}
+
+.modal-sub {
+  margin: 2px 0 0;
+  color: var(--text-2);
+  font-size: 0.9em;
+}
+
+.modal-x {
+  margin-left: auto;
+}
+
+.modal-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 18px;
+  margin: 0 0 14px;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.modal-facts dt {
+  color: var(--text-2);
+}
+
+.modal-facts dd {
+  margin: 0;
+  word-break: break-word;
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  font-size: 0.9em;
+}
+
+.redaction-banner {
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--ok-bg);
+  color: var(--ok);
+  font-size: 0.9em;
+  margin-bottom: 14px;
+}
+
+.redaction-banner.is-clear {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.modal-preview-label {
+  font-size: 0.74em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  margin: 0 0 6px;
+}
+
+.modal-preview {
+  margin: 0;
+  max-height: 260px;
+}
+
+/* --- Feedback modal ----------------------------------------------------- */
+.fb-label {
+  display: block;
+  font-size: 0.8em;
+  color: var(--text-2);
+  margin: 4px 0 4px;
+}
+
+.fb-input,
+.fb-textarea {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.fb-input::placeholder,
+.fb-textarea::placeholder {
+  color: var(--text-3);
+}
+
+.fb-textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.fb-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.fb-banner {
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+  font-size: 0.92em;
+}
+
+.fb-banner.is-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.fb-banner.is-error {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+/* --- Responsive: narrow (sidebar) collapses to one column -------------- */
+@media (max-width: 560px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  /* One column. `display: contents` dissolves .explain-main so the answer, the
+     facts, and the composer become siblings and can be ordered directly —
+     otherwise the rail lands *below* the ask box, because it is a sibling of
+     the wrapper the composer lives in. */
+  .explain-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .explain-main {
+    display: contents;
+  }
+
+  .explain-scroll {
+    order: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  /* Folded shut this is one row; opened it takes at most half the panel and
+     scrolls itself, so it can never crowd out the answer. */
+  .facts-rail {
+    order: 2;
+    flex: 0 1 auto;
+    max-height: 50%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+  }
+
+  .composer {
+    order: 3;
+  }
+
+  .tabs {
+    margin-left: 0;
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
