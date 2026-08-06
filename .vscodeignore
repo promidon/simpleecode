@@ -26,6 +26,7 @@ site/**
 deno.lock
 *.vsix
 AGENTS.md
+HANDOFF-TEMP.md
 CLAUDE.md
 ROADMAP.md
 CODE_OF_CONDUCT.md

@@ -11,6 +11,7 @@ DEFAULT_NOTES="docs/releases/${VERSION}.md"
 usage() {
   echo "Usage:"
   echo "  ./scripts/release.sh prepare [notes-file]"
+  echo "  ./scripts/release.sh prepare-site <vsix-file> <checksums-file> [notes-file]"
   echo "  ./scripts/release.sh verify"
   echo "  ./scripts/release.sh deploy-preview"
   echo "  ./scripts/release.sh deploy-production"
@@ -35,6 +36,41 @@ prepare() {
   echo "→ Packaging ${VSIX}"
   npx --no-install vsce package --out "${VSIX}"
   node scripts/build-release.mjs "${notes_file}"
+  node scripts/verify-release.mjs
+}
+
+prepare_site() {
+  local vsix_file="${1:-}"
+  local checksums_file="${2:-}"
+  local notes_file="${3:-${DEFAULT_NOTES}}"
+  require_stable_version
+
+  if [ -z "${vsix_file}" ] || [ -z "${checksums_file}" ]; then
+    echo "✗ prepare-site requires the released VSIX and SHA256SUMS.txt paths."
+    exit 1
+  fi
+  if [ ! -f "${vsix_file}" ]; then
+    echo "✗ Released VSIX not found: ${vsix_file}"
+    exit 1
+  fi
+  if [ ! -f "${checksums_file}" ]; then
+    echo "✗ Checksum file not found: ${checksums_file}"
+    exit 1
+  fi
+  if [ ! -f "${notes_file}" ]; then
+    echo "✗ Release notes not found: ${notes_file}"
+    exit 1
+  fi
+
+  local expected_sha256
+  expected_sha256="$(awk -v file="${VSIX}" '$2 == file { print $1 }' "${checksums_file}")"
+  if ! [[ "${expected_sha256}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    echo "✗ ${checksums_file} has no valid checksum for ${VSIX}."
+    exit 1
+  fi
+
+  echo "→ Reusing released ${VSIX}"
+  node scripts/build-release.mjs "${notes_file}" "${vsix_file}" "${expected_sha256}"
   node scripts/verify-release.mjs
 }
 
@@ -109,6 +145,9 @@ github_release() {
 case "${1:-}" in
   prepare)
     prepare "${2:-}"
+    ;;
+  prepare-site)
+    prepare_site "${2:-}" "${3:-}" "${4:-}"
     ;;
   verify)
     node scripts/verify-release.mjs
