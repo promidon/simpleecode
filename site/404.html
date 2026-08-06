@@ -1,21 +1,30 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0e110f">
     <meta name="robots" content="noindex">
     <title>Page not found — SimpleeCode</title>
     <link rel="icon" href="/assets/simpleecode-icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/styles.css">
+    <script src="/site.js" defer></script>
   </head>
   <body>
-    <main class="section">
-      <p class="eyebrow">404 · Page not found</p>
-      <h1>That page is not here.</h1>
-      <p class="lede">The link may be old, or the address may have been typed incorrectly.</p>
-      <div class="actions">
-        <a class="button primary" href="/">Go to SimpleeCode</a>
-        <a class="button secondary" href="/download">Download the latest VSIX</a>
+    <main class="error-page">
+      <div class="hero-grid" aria-hidden="true"></div>
+      <a class="brand" href="/" aria-label="SimpleeCode home">
+        <img src="/assets/simpleecode-icon.svg" alt="" width="30" height="30">
+        <span>SimpleeCode</span>
+      </a>
+      <div class="error-copy">
+        <p class="eyebrow">404 · Page not found</p>
+        <h1>That page<br><em>is not here</em></h1>
+        <p class="lede">The link may be old, or the address may have been typed incorrectly.</p>
+        <div class="actions">
+          <a class="button primary" href="/">Go to SimpleeCode</a>
+          <a class="button quiet" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__">Download the latest VSIX</a>
+        </div>
       </div>
     </main>
   </body>

@@ -296,6 +296,7 @@
     "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
     "package": "vsce package",
     "release:prepare": "./scripts/release.sh prepare",
+    "release:prepare-site": "./scripts/release.sh prepare-site",
     "release:verify": "./scripts/release.sh verify",
     "release:github": "./scripts/release.sh github-release",
     "deploy:preview": "./scripts/release.sh deploy-preview",
