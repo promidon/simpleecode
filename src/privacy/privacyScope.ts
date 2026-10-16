@@ -7,6 +7,14 @@ const SCOPE_RANK: Record<PrivacyScope, number> = {
   system_context: 3,
 };
 
+/** What each scope means to a person reading the sidebar. */
+export const PRIVACY_SCOPE_LABELS: Record<PrivacyScope, string> = {
+  selection_only: 'selection only',
+  current_file: 'this file',
+  related_files: 'related files',
+  system_context: 'project context',
+};
+
 const TASK_SCOPE: Record<ExplanationTask, PrivacyScope> = {
   explain_selection: 'selection_only',
   explain_file: 'current_file',

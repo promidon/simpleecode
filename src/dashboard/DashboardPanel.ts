@@ -40,6 +40,8 @@ export interface DashboardState {
   };
   /** In-extension feedback needs a per-user token; otherwise offer GitHub Issues. */
   feedbackConfigured: boolean;
+  /** Display labels for raw ids the webview shows (one source of truth on the host). */
+  labels: { scopes: Record<string, string> };
   lastPacket?: {
     task: string;
     privacyScope: string;

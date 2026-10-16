@@ -9,8 +9,14 @@
  * This is deliberately a limited claim checker, not a proof of the whole answer.
  * Anything it does not recognize remains unchecked and the UI must say so.
  */
+import { keywordDefinition } from '../context/keywordGlossary';
+
 export interface AnswerGroundTruth {
+  /** VS Code language id of the sent code, so language keywords are not treated as claims. */
+  languageId?: string;
   sentFilePath?: string;
+  /** Workspace-relative name of the sent file, shown instead of its absolute path. */
+  sentFileLabel?: string;
   /** The code text that was actually sent (selection and/or full file). */
   sentCode: string;
   sentSymbol?: string;
@@ -41,9 +47,10 @@ interface VerifiedClaim {
   /**
    * Where to open to check this claim in one click (notes #2, click-through).
    * Set for grounded file references and in-range line references. `path` is a
-   * workspace-relative or absolute path; `line` is 1-based when known.
+   * workspace-relative or absolute path to open; `label` is what to show (never a
+   * home-directory path); `line` is 1-based when known.
    */
-  location?: { path: string; line?: number };
+  location?: { path: string; label: string; line?: number };
 }
 
 export interface VerifyResult {
@@ -100,15 +107,15 @@ export function verifyAnswer(
       note: resolvedPath
         ? 'Matches a file in your index.'
         : 'No such file in your index — possibly invented.',
-      location: resolvedPath ? { path: resolvedPath } : undefined,
+      location: resolvedPath ? locate(resolvedPath, truth) : undefined,
     });
   }
 
   // --- backticked code identifiers (e.g. `send()`, `SinglyViewModel`) ---
   for (const m of answer.matchAll(CODE_SPAN_RE)) {
     const span = m[1].trim();
-    if (!IDENT_RE.test(span) || FILE_EXT_RE.test(span)) {
-      continue; // skip code lines, prose, and file names (handled above)
+    if (!IDENT_RE.test(span) || FILE_EXT_RE.test(span) || isLanguageWord(span, truth.languageId)) {
+      continue; // skip code lines, prose, file names (handled above), and keywords like `struct`
     }
     const key = `symbol:${span.toLowerCase()}`;
     if (seen.has(key)) {
@@ -152,7 +159,7 @@ export function verifyAnswer(
           : `Outside the sent range (${truth.sentStartLine}-${truth.sentEndLine}).`,
         location:
           grounded && truth.sentFilePath
-            ? { path: truth.sentFilePath, line: start }
+            ? { ...locate(truth.sentFilePath, truth), line: start }
             : undefined,
       });
     }
@@ -182,6 +189,17 @@ export function verifyAnswer(
         ? 'No checkable file, symbol, line, type, or documentation claims were detected. The prose remains unchecked.'
         : 'Limited check only: unrecognized prose and behavior claims remain unchecked.',
   };
+}
+
+/** Literals and self-references that are never claims about the user's code. */
+const LANGUAGE_LITERALS = new Set([
+  'true', 'false', 'nil', 'null', 'undefined', 'None', 'True', 'False', 'self', 'Self', 'this', 'super',
+]);
+
+/** A language keyword (`struct`, `guard`, `const`) or literal says nothing about the project. */
+function isLanguageWord(span: string, languageId?: string): boolean {
+  // Plain object lookup: require a real string so `constructor` etc. never match the prototype.
+  return LANGUAGE_LITERALS.has(span) || (languageId !== undefined && typeof keywordDefinition(span, languageId) === 'string');
 }
 
 const PRIMITIVE_TYPES = new Set([
@@ -268,6 +286,12 @@ function documentationClaim(
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Where to open a path, labelled workspace-relative (indexed paths already are). */
+function locate(path: string, truth: AnswerGroundTruth): { path: string; label: string } {
+  const label = path === truth.sentFilePath ? truth.sentFileLabel ?? basename(path) : path;
+  return { path, label };
 }
 
 /** The openable path for a file reference, or undefined if it's not in the index. */

@@ -142,24 +142,7 @@
   const explanationView = window.createExplanationView(vscode, selectTab, (turn, state) =>
     turn.status === 'handed-off' ? '<p>No answer was captured or checked here. Continue in the external chat.</p>' :
     answerBlock({ text: turn.text, html: turn.html, done: !['sending', 'streaming'].includes(turn.status), verify: turn.verify },
-      { ...state, answerGoal: turn.goalLabel }));
-  // --- Ask box --------------------------------------------------------------
-  const askForm = document.getElementById('ask');
-  const askInput = document.getElementById('ask-input');
-  if (askForm && askInput) {
-    askInput.value = savedUi.askText || '';
-    askInput.addEventListener('input', persist);
-    askForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const text = askInput.value.trim();
-      if (!text) {
-        return;
-      }
-      vscode.postMessage({ type: 'submitPrompt', text });
-      persist();
-    });
-  }
-
+      { ...state, answerGoal: turn.goalLabel }, true));
   // --- Check box ------------------------------------------------------------
   const checkRun = document.getElementById('check-run');
   const checkInput = document.getElementById('check-input');
@@ -367,6 +350,7 @@
     }
     if (els.statusPill.textContent !== text) {
       els.statusPill.textContent = text;
+      els.statusPill.title = text; // the pill truncates in narrow sidebars
     }
   }
 
@@ -383,7 +367,7 @@
     } else {
       loc = '<span class="muted">whole file (no selection)</span>';
     }
-    updateHtml(els.contextBar, `<span class="file-chip">${esc(state.activeFile)}</span>${loc}`);
+    updateHtml(els.contextBar, `<span class="file-chip" title="${esc(state.activeFile)}">${esc(state.activeFile)}</span>${loc}`);
   }
 
   // --- Modals (review + feedback share #modal-root) ------------------------
@@ -526,11 +510,13 @@
   document.addEventListener('keydown', trapFocus);
 
   // --- Explain panel --------------------------------------------------------
-  function answerBlock(a, state) {
-    let body =
-      '<div class="answer-head"><span class="answer-kicker">' +
-      `<span class="answer-dot" aria-hidden="true"></span>Explanation · ${esc(activeDepth(state))}` +
-      '</span></div>';
+  // In a turn, the turn heading and status line already name the goal and progress.
+  function answerBlock(a, state, inTurn = false) {
+    let body = inTurn
+      ? ''
+      : '<div class="answer-head"><span class="answer-kicker">' +
+        `<span class="answer-dot" aria-hidden="true"></span>Explanation · ${esc(activeDepth(state))}` +
+        '</span></div>';
     if (a.html) {
       body += `<div class="answer">${a.html}</div>`;
     } else if (a.text) {
@@ -540,21 +526,21 @@
       body +=
         '<div class="streaming-row"><span class="streaming-dots" aria-hidden="true">' +
         '<span></span><span></span><span></span></span>' +
-        '<span class="muted">Claude is answering…</span></div>';
+        (inTurn ? '' : '<span class="muted">Claude is answering…</span>') + '</div>';
     } else if (a.verify) {
       const v = a.verify;
-      body += `<p class="check-summary">Limited check: <strong>${v.grounded}</strong> grounded · <strong>${v.unverified}</strong> unverified</p>`;
-      body += `<p class="muted">${esc(v.note || 'Unrecognized prose remains unchecked.')}</p>`;
+      body += checkChips(v.grounded, v.unverified);
+      body += `<p class="hint">${esc(v.note || 'Unrecognized prose remains unchecked.')}</p>`;
       const claims = v.claims || [];
       const flagged = claims.filter((c) => c.status !== 'grounded');
       if (flagged.length) {
         body += '<ul class="claims">' + flagged.map((c) => claimItem(c, warnBadge)).join('') + '</ul>';
       }
-      const sources = dedupeSources(claims.filter((c) => c.status === 'grounded' && c.location));
-      if (sources.length) {
+      const groups = sourceGroups(claims.filter((c) => c.status === 'grounded' && c.location));
+      if (groups.length) {
         body +=
-          '<p class="muted">Jump to source (check it yourself):</p><ul class="claims">' +
-          sources.map((c) => `<li>${sourceLink(c.location)}</li>`).join('') +
+          '<p class="muted">Check it yourself in the source:</p><ul class="sources">' +
+          groups.map(sourceGroup).join('') +
           '</ul>';
       }
     }
@@ -725,13 +711,11 @@
       announce('Check complete: no checkable claims.');
       return;
     }
-    const summary =
-      `<p class="check-summary">Limited check: <strong>${result.grounded}</strong> grounded · ` +
-      `<strong>${result.unverified}</strong> unverified</p>`;
+    const summary = checkChips(result.grounded, result.unverified);
     const items = result.claims
       .map((c) => claimItem(c, c.status === 'grounded' ? okBadge : warnBadge))
       .join('');
-    els.checkResults.innerHTML = `${summary}<p class="muted">${esc(result.note)}</p><ul class="claims">${items}</ul>`;
+    els.checkResults.innerHTML = `${summary}<p class="hint">${esc(result.note)}</p><ul class="claims">${items}</ul>`;
     announce(`Check complete: ${result.grounded} grounded, ${result.unverified} unverified.`);
   }
 
@@ -742,19 +726,31 @@
       return;
     }
     const focused = element.contains(document.activeElement) ? document.activeElement : null;
-    const key = focused && (focused.dataset.command || focused.dataset.path);
+    const keyOf = (e) => e.dataset.command || `${e.dataset.path}:${e.dataset.line || ''}`;
+    const key = focused && keyOf(focused);
     element.innerHTML = html;
     element.dataset.rendered = html;
     if (!focused) {
       return;
     }
     const same = Array.from(element.querySelectorAll('[data-command], [data-path]'))
-      .find((e) => !e.disabled && (e.dataset.command || e.dataset.path) === key);
+      .find((e) => !e.disabled && keyOf(e) === key);
     const fallback = element.closest('[role="tabpanel"]');
     (same || fallback)?.focus({ preventScroll: true });
   }
 
   // --- Shared helpers -------------------------------------------------------
+  /** "Limited check: 23 grounded · 2 to check" as two chips; the warn chip only when needed. */
+  function checkChips(grounded, unverified) {
+    return (
+      '<p class="check-chips"><span class="sr-only">Limited check: </span>' +
+      `<span class="chip chip-ok">${grounded} grounded</span>` +
+      (unverified ? `<span class="chip chip-warn">${unverified} to check</span>` : '<span class="chip">nothing to check</span>') +
+      '</p>'
+    );
+  }
+
+  const CLAIM_KINDS = { file: 'File', symbol: 'Name', line: 'Line', fact: 'Fact', doc: 'Docs' };
   const okBadge = '<span class="badge ok"><span aria-hidden="true">✓</span><span class="sr-only">Grounded:</span></span>';
   const warnBadge = '<span class="badge warn"><span aria-hidden="true">⚠</span><span class="sr-only">Unverified:</span></span>';
 
@@ -764,31 +760,45 @@
       '<li class="claim-row">' +
       badge +
       '<div class="claim-body">' +
-      `<div class="claim-main"><strong>${esc(c.kind)}</strong> <code>${esc(c.text)}</code></div>` +
+      `<div class="claim-main"><strong>${esc(CLAIM_KINDS[c.kind] || c.kind)}</strong> <code>${esc(c.text)}</code></div>` +
       `<div class="claim-note">${esc(c.note)}</div>` +
       src +
       '</div></li>'
     );
   }
 
+  // `label` is workspace-relative; `path` (possibly absolute) is only used to open the file.
   function sourceLink(loc) {
-    const label = loc.line ? `${esc(loc.path)}:${loc.line}` : esc(loc.path);
-    return (
-      `<a href="#" data-open-source data-path="${esc(loc.path)}" data-line="${loc.line || ''}">↗ ${label}</a>`
-    );
+    const name = esc(loc.label || loc.path);
+    const label = loc.line ? `${name}:${loc.line}` : name;
+    return `<a href="#" data-open-source data-path="${esc(loc.path)}" data-line="${loc.line || ''}">${label}</a>`;
   }
 
-  function dedupeSources(claims) {
-    const seen = new Set();
-    const out = [];
-    for (const c of claims) {
-      const key = `${c.location.path}:${c.location.line || ''}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        out.push(c);
+  /** Grounded locations grouped per file, lines sorted and deduplicated. */
+  function sourceGroups(claims) {
+    const groups = new Map();
+    for (const { location: loc } of claims) {
+      const group = groups.get(loc.path) || { path: loc.path, label: loc.label || loc.path, lines: new Set() };
+      if (loc.line) {
+        group.lines.add(loc.line);
       }
+      groups.set(loc.path, group);
     }
-    return out;
+    return Array.from(groups.values(), (g) => ({ ...g, lines: Array.from(g.lines).sort((a, b) => a - b) }));
+  }
+
+  /** "App/AppConfig.swift  6 · 8 · 16": the file name opens the file, each number its line. */
+  function sourceGroup(g) {
+    const path = esc(g.path);
+    const label = esc(g.label);
+    const lines = g.lines
+      .map((n) => `<a href="#" data-open-source data-path="${path}" data-line="${n}" aria-label="${label} line ${n}">${n}</a>`)
+      .join('');
+    return (
+      `<li class="source-group"><a href="#" data-open-source data-path="${path}" data-line="">${label}</a>` +
+      (lines ? `<span class="source-lines">${lines}</span>` : '') +
+      '</li>'
+    );
   }
 
   function emptyState(title, sub, extra) {

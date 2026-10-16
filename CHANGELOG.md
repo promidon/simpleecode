@@ -7,6 +7,29 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-10-16
+
+### Changed
+
+- The Explain sidebar is reorganized: one setup card (source, goal, optional
+  guidance, a one-line privacy summary, Explain) that folds into a one-line
+  summary once an answer arrives, with Edit to reopen it.
+- Goal is a three-way choice instead of a dropdown; guidance has quick
+  suggestions (ELI5, Keep it brief, New to your language).
+- Check results show as grounded / to-check chips; sources are grouped per file
+  with clickable line numbers.
+
+### Fixed
+
+- Markdown tables in answers render as tables, not raw `|` text.
+- Language keywords and literals such as `struct` or `nil` are no longer flagged
+  as unverified.
+- Statuses read in plain language ("Answer complete.") instead of raw protocol
+  values such as `end_turn` or `selection_only`.
+- Sources show workspace-relative paths instead of absolute home-directory paths.
+- The status no longer hides under the tabs; one scrollbar; no focus ring around
+  the whole panel; one Stop button while streaming.
+
 ## [0.2.0] — 2026-10-16
 
 ### Added

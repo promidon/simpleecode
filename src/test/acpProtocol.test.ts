@@ -9,6 +9,7 @@ import {
   promptRequest,
   rejectPermissionResult,
   stopReasonOf,
+  describeStopReason,
 } from '../acp/acpProtocol';
 
 test('parseMessage rejects non-JSON-RPC lines', () => {
@@ -83,4 +84,13 @@ test('stopReasonOf degrades to "unknown"', () => {
   assert.equal(stopReasonOf({ stopReason: 'end_turn' }), 'end_turn');
   assert.equal(stopReasonOf({}), 'unknown');
   assert.equal(stopReasonOf(undefined), 'unknown');
+});
+
+test('describeStopReason never shows raw protocol values', () => {
+  assert.equal(describeStopReason('end_turn'), 'Answer complete.');
+  assert.match(describeStopReason('max_tokens'), /length limit/);
+  assert.match(describeStopReason('refusal'), /declined/);
+  for (const reason of ['end_turn', 'max_tokens', 'max_turn_requests', 'refusal', 'cancelled', 'unknown', 'weird_new_reason']) {
+    assert.doesNotMatch(describeStopReason(reason), /_/);
+  }
 });
