@@ -197,33 +197,37 @@ code {
   border-radius: 4px;
 }
 
+/* Tab panels are only a focus fallback (tabindex=-1), never a control: no ring
+   around the whole sidebar when focus is parked there. */
+[role='tabpanel']:focus {
+  outline: none;
+}
+
 /* --- Shell + header ----------------------------------------------------- */
-/* `height`, not `min-height`: the shell must be exactly the viewport so the
-   answer scrolls inside .explain-scroll and the composer stays pinned. With
-   min-height a long answer grew the shell instead, pushing the ask box off
-   the bottom of the sidebar. */
+/* `height`, not `min-height`: the shell is exactly the viewport, so each panel
+   (not the page) scrolls and nothing can be pushed below the sidebar. */
 .shell {
   display: flex;
   flex-direction: column;
   height: 100%;
+  container-type: inline-size; /* the header wraps on the sidebar's width, not the window's */
 }
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
-  padding: 10px 16px;
+  gap: 8px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
-  position: sticky;
-  top: 0;
-  z-index: 5;
 }
 
 .brand {
   display: flex;
+  flex: 1 1 0;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -237,27 +241,31 @@ code {
   letter-spacing: -0.01em;
 }
 
+/* Block (not flex) so long status text ends in an ellipsis instead of running
+   under the tabs; the full text is in the title tooltip. */
 .status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 2px 10px;
-  margin-left: 4px;
   border-radius: 999px;
   font-size: 0.82em;
   color: var(--text-2);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  white-space: nowrap;
 }
 
 .status-pill::before {
   content: '';
+  display: inline-block;
   width: 7px;
   height: 7px;
+  margin-right: 6px;
   border-radius: 50%;
   background: var(--text-3);
-  flex: none;
+  vertical-align: 0.05em;
 }
 
 .status-pill.is-ready::before {
@@ -275,6 +283,7 @@ code {
 /* Tab bar */
 .tabs {
   display: flex;
+  flex: none;
   gap: 2px;
   margin-left: auto;
   background: var(--surface-2);
@@ -364,9 +373,8 @@ code {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 9px 16px;
-  border-bottom: 1px solid var(--border);
+  gap: 6px 10px;
+  min-width: 0;
   font-size: 0.88em;
   color: var(--text-2);
 }
@@ -376,9 +384,12 @@ code {
 }
 
 .file-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
   padding: 3px 9px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -403,38 +414,6 @@ code {
 
 .preview-btn:hover {
   background: var(--surface-2);
-}
-
-/* --- Explain body (two columns) ---------------------------------------- */
-.explain-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
-  flex: 1;
-  min-height: 0;
-}
-
-.explain-main {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-}
-
-.explain-scroll {
-  flex: 1;
-  overflow: auto;
-  padding: 18px 20px;
-}
-
-.facts-rail {
-  border-left: 1px solid var(--border);
-  background: var(--surface-2);
-  overflow: auto;
-  padding: 16px;
-}
-
-.facts-rail:empty {
-  display: none;
 }
 
 /* The facts fold. Wide, it is an always-open heading over the card; narrow, it
@@ -477,107 +456,6 @@ code {
 
 .facts-fold[open] .facts-summary-symbol {
   display: none;
-}
-
-/* --- Composer (depth + ask) -------------------------------------------- */
-.composer {
-  border-top: 1px solid var(--border);
-  padding: 12px 16px;
-  background: var(--surface);
-}
-
-.composer-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-
-.depth-label {
-  color: var(--text-2);
-  font-size: 0.85em;
-}
-
-.segmented {
-  display: inline-flex;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px;
-}
-
-.seg {
-  padding: 4px 12px;
-  border-radius: 999px;
-  color: var(--text-2);
-  font-size: 0.88em;
-  min-height: 24px;
-}
-
-.seg:hover {
-  color: var(--text);
-}
-
-.seg.is-active {
-  color: var(--accent);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-}
-
-.ghost-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  color: var(--text-2);
-  min-height: 24px;
-}
-
-.ghost-btn:hover {
-  color: var(--text);
-  background: var(--surface-2);
-}
-
-.new-btn {
-  margin-left: auto;
-}
-
-.ask {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-
-.ask input {
-  flex: 1;
-  min-width: 0;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 9px 12px;
-  color: var(--text);
-}
-
-.ask input::placeholder {
-  color: var(--text-3);
-}
-
-.send-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  border-radius: var(--radius-sm);
-  background: var(--accent-fill);
-  color: var(--accent-on);
-  font-size: 1.1em;
-  flex: none;
-}
-
-.send-btn:hover {
-  filter: brightness(1.06);
 }
 
 /* --- Shared answer window (Explain / Tour / Check) --------------------- */
@@ -817,6 +695,58 @@ ul.links a,
   padding-left: 12px;
   border-left: 3px solid var(--border-2);
   color: var(--text-2);
+}
+
+/* Sources: one row per file, line numbers as small links. */
+.sources {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.source-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+.source-lines {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.sources a {
+  color: var(--accent);
+}
+
+/* Model tables: fixed layout so long cells wrap instead of widening the sidebar. */
+.answer table {
+  width: 100%;
+  margin: 10px 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.95em;
+}
+
+.answer th,
+.answer td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.answer th {
+  color: var(--text-2);
+  font-weight: 600;
 }
 
 .explanation {
@@ -1072,7 +1002,9 @@ ul.claims li {
 }
 
 .primary-btn:disabled {
-  opacity: 0.5;
+  background: var(--surface-2);
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--border-2);
   cursor: default;
   filter: none;
 }
@@ -1312,52 +1244,16 @@ ul.claims li {
   color: var(--warn);
 }
 
-/* --- Responsive: narrow (sidebar) collapses to one column -------------- */
-@media (max-width: 560px) {
-  .topbar {
-    flex-wrap: wrap;
-  }
-
-  /* One column. `display: contents` dissolves .explain-main so the answer, the
-     facts, and the composer become siblings and can be ordered directly —
-     otherwise the rail lands *below* the ask box, because it is a sibling of
-     the wrapper the composer lives in. */
-  .explain-body {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .explain-main {
-    display: contents;
-  }
-
-  .explain-scroll {
-    order: 1;
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-
-  /* Folded shut this is one row; opened it takes at most half the panel and
-     scrolls itself, so it can never crowd out the answer. */
-  .facts-rail {
-    order: 2;
-    flex: 0 1 auto;
-    max-height: 50%;
-    border-left: none;
-    border-top: 1px solid var(--border);
-    padding: 10px 16px;
-  }
-
-  .composer {
-    order: 3;
-  }
-
+/* --- Narrow sidebar: tabs get their own row ------------------------------ */
+@container (max-width: 440px) {
   .tabs {
-    margin-left: 0;
     order: 3;
     width: 100%;
-    justify-content: center;
+    margin-left: 0;
+  }
+
+  .tab {
+    flex: 1;
   }
 }
 
@@ -1374,37 +1270,133 @@ body.vscode-reduce-motion * {
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
 }
-/* Prepared explanation and inspector share one scrolling surface. No fixed
+/* --- Explain workspace (Direction A) ------------------------------------
+   Prepared explanation and inspector share one scrolling surface. No fixed
    action/footer can conceal controls in a short or zoomed sidebar. */
 .explain-workspace, .explanation-inspector {
   flex: 1; min-height: 0; min-width: 0; overflow: auto;
-  padding: 16px; overflow-wrap: anywhere; scrollbar-gutter: stable;
+  padding: 12px; overflow-wrap: anywhere; scrollbar-gutter: stable;
 }
-.explanation-controls { display: grid; gap: 8px; margin: 20px 0; }
-.explanation-controls label, #followup-form label { font-weight: 700; }
-.explanation-controls select, .explanation-controls textarea, #followup-question {
+.explain-workspace { display: grid; gap: 12px; align-content: start; }
+.explanation-inspector { display: grid; gap: 10px; align-content: start; }
+#inspector-title { margin: 0; font-size: 1.05em; font-weight: 600; }
+
+/* Setup card and its one-line summary */
+.setup-card {
+  display: grid; gap: 12px; padding: 12px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+}
+.setup-summary {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-2); font-size: 0.88em; color: var(--text-2);
+}
+.setup-summary-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.source-row { display: flex; align-items: flex-start; gap: 8px; }
+.source-row .context-bar { flex: 1 1 0; }
+.source-menu { position: relative; }
+.source-menu > summary { list-style: none; cursor: pointer; }
+.source-menu > summary::-webkit-details-marker { display: none; }
+.btn-sm { display: inline-flex; align-items: center; min-height: 26px; padding: 2px 10px; font-size: 0.88em; }
+.source-menu-list {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 10; min-width: 200px;
+  display: grid; padding: 4px; border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+  background: var(--elev); box-shadow: var(--shadow-card);
+}
+.menu-row { text-align: left; padding: 6px 10px; border-radius: var(--radius-sm); min-height: 28px; }
+.menu-row:hover { background: var(--surface-2); }
+
+/* Fields */
+.explanation-controls { display: grid; gap: 6px; }
+.explanation-controls > label, .goal-field legend, #followup-form > label { font-weight: 600; font-size: 0.92em; margin-top: 6px; }
+.goal-field { margin: 0; padding: 0; border: 0; min-width: 0; }
+.goal-field legend { padding: 0; margin: 0 0 6px; }
+.optional { font-weight: 400; color: var(--text-2); }
+.explanation-controls textarea, #followup-question {
   box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%;
   font: inherit; color: var(--text); background: var(--surface);
-  border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 8px;
+  border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 8px; resize: vertical;
 }
-.explanation-controls textarea, #followup-question { resize: vertical; }
-.explanation-controls p { margin: 0 0 8px; }
-.source-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-.source-actions button { min-height: 32px; white-space: normal; }
-#explanation-inspector pre, #safe-guidance, #captured-code {
+.hint { margin: 0; font-size: 0.85em; color: var(--text-2); }
+.field-error { margin: 0; color: var(--warn); font-size: 0.88em; }
+.notice { margin: 0; font-size: 0.88em; color: var(--text-2); }
+/* Empty status messages stay in the accessibility tree (so later text is
+   announced) but take no space in the layout. */
+.notice:empty {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+/* Goal: three radios drawn as one segmented control */
+.segmented {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--border-2); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface);
+}
+.seg { position: relative; display: flex; }
+.seg + .seg { border-left: 1px solid var(--border-2); }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { flex: 1; padding: 6px 4px; text-align: center; font-size: 0.88em; color: var(--text-2); min-height: 18px; }
+.seg:has(input:checked) span { background: var(--accent-tint); color: var(--accent); font-weight: 600; }
+.seg:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+#goal-description { margin-top: 6px; }
+
+/* Guidance suggestions and default */
+.pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill {
+  min-height: 24px; padding: 2px 10px; border-radius: 999px; font-size: 0.85em;
+  border: 1px solid var(--border-2); background: var(--surface); color: var(--text);
+}
+.pill:hover { border-color: var(--accent); }
+.pill-quiet { border-style: dashed; color: var(--text-2); }
+.confirm { display: grid; gap: 8px; }
+
+/* Privacy: one line, details on demand */
+.privacy-line { display: flex; align-items: flex-start; gap: 6px; color: var(--text-2); font-size: 0.88em; }
+.privacy-icon { display: inline-flex; color: var(--ok); margin-top: 1px; }
+#sharing-summary { margin: 0; }
+.fold > summary { cursor: pointer; color: var(--text-2); font-size: 0.88em; padding: 4px 0; }
+#preparation-gaps, #inspector-summary { white-space: pre-line; font-size: 0.88em; color: var(--text-2); margin-top: 4px; }
+
+.action-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.action-row .primary-btn { flex: 1 1 auto; justify-content: center; }
+.link-btn {
+  min-height: 24px; padding: 0; border: 0; background: none;
+  color: var(--accent); font-size: 0.88em; text-underline-offset: 2px;
+}
+.link-btn:hover { text-decoration: underline; }
+.link-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+#explanation-inspector pre, #safe-guidance, #captured-code, .answer pre {
   max-height: none; overflow: visible;
   white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-width: 100%;
 }
-#inspector-summary, #preparation-gaps { white-space: pre-line; }
-#local-explanation { white-space: pre-wrap; margin: 20px 0; }
-#explain-content article { padding: 20px 0; border-top: 1px solid var(--border-2); }
-#explain-content article h2 { font-size: 1.05em; }
-#guidance-error { color: var(--warn); }
-#followup-form { display: grid; gap: 8px; padding: 20px 0; }
+#local-explanation { white-space: pre-wrap; margin: 8px 0 0; }
 .explain-workspace #facts-rail { max-height: none; overflow: visible; }
-@media (max-width: 560px) {
-  .topbar { flex-wrap: wrap; }
-  .brand { flex-wrap: wrap; }
-  .tabs { order: 3; width: 100%; }
-  .explain-workspace, .explanation-inspector { padding: 12px; }
+
+/* Answers */
+#explain-content { display: grid; gap: 16px; }
+#explain-content article { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+#explain-content article:first-child { border-top: 0; padding-top: 0; }
+.turn-title { margin: 0; font-size: 0.92em; font-weight: 600; color: var(--text-2); }
+.turn-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 0.85em; color: var(--text-2); }
+.turn-status { margin: 0; }
+.turn-stop { justify-self: start; }
+.check-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+.chip { padding: 1px 8px; border-radius: 999px; font-size: 0.85em; border: 1px solid var(--border-2); color: var(--text-2); }
+.chip-ok { color: var(--ok); border-color: currentColor; }
+.chip-warn { color: var(--warn); border-color: currentColor; }
+
+/* Follow-up */
+.followup { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+.followup-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.icon-only { width: 34px; min-height: 34px; padding: 0; justify-content: center; }
+
+/* Windows High Contrast / forced colours: keep every boundary visible. */
+@media (forced-colors: active) {
+  .setup-card, .setup-summary, .segmented, .pill, .chip, .btn, .primary-btn,
+  .file-chip, .source-menu-list, .status-pill, .tabs {
+    border: 1px solid CanvasText;
+  }
+  .seg:has(input:checked) span { outline: 2px solid Highlight; outline-offset: -3px; }
+  .primary-btn:disabled { color: GrayText; }
 }

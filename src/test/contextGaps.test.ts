@@ -64,5 +64,5 @@ test('explains when the privacy maximum caps system context', () => {
     hadSecretRedaction: false,
     privacyScope: 'current_file',
   });
-  assert.ok(gaps.some((gap) => /capped at current_file/.test(gap)));
+  assert.ok(gaps.some((gap) => /capped at this file/.test(gap)));
 });

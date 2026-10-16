@@ -5,7 +5,10 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
   const inspector = $('explanation-inspector');
   const presentation = vscode.getState()?.explanationPresentation;
   let restored = false;
-  let state, inspected, returnFocus, returnScroll = 0, timer, sourceKey, optionsKey;
+  let state, inspected, returnFocus, returnScroll = 0, timer, sourceKey, optionsKey, editing = false, lastTurnCount = 0;
+  const goalInput = () => document.querySelector('input[name="explanation-goal"]:checked');
+  const setGoal = value => { const radio = document.querySelector(`input[name="explanation-goal"][value="${value}"]`); if (radio) { radio.checked = true; } };
+  const LANGUAGES = { swift: 'Swift', typescript: 'TypeScript', typescriptreact: 'TypeScript', javascript: 'JavaScript', javascriptreact: 'JavaScript', python: 'Python', go: 'Go', rust: 'Rust', java: 'Java', ruby: 'Ruby' };
   function savePresentation() {
     if (!restored) { return; }
     vscode.setState({ ...vscode.getState(), explanationPresentation: {
@@ -21,9 +24,13 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
     investigate: 'Compare observations, possible causes, and checks you can try.',
   };
   const post = message => vscode.postMessage({ type: 'explanation', message });
+  // Plain-language wording for raw ids; scope labels come from the host.
+  const STATUS = { sending: 'Sending…', streaming: 'Answering…', done: 'Answered', cancelled: 'Stopped', failed: 'Failed', 'handed-off': 'Handed off to your chat' };
+  let scopeLabels = {};
+  const scopeLabel = scope => scopeLabels[scope] || String(scope).replaceAll('_', ' ');
   const text = (id, value) => { if ($(id).textContent !== value) { $(id).textContent = value; } };
   function options() {
-    return { goal: $('explanation-goal').value, question: $('explanation-question').value, guidance: $('explanation-guidance').value };
+    return { goal: goalInput()?.value || 'understand', question: $('explanation-question').value, guidance: $('explanation-guidance').value };
   }
   function valid() {
     const invalid = options().guidance.length > 2000;
@@ -39,7 +46,26 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
   ['explanation-goal', 'explanation-question', 'explanation-guidance'].forEach(id => $(id).addEventListener('input', edit));
   document.addEventListener('click', event => {
     const target = event.target.closest('[data-explanation]');
-    if (target) { clearTimeout(timer); timer = undefined; post({ action: target.dataset.explanation }); }
+    if (target) {
+      clearTimeout(timer); timer = undefined;
+      if (target.closest('#source-menu')) { $('source-menu').open = false; $('source-menu').querySelector('summary').focus(); }
+      if (target.dataset.explanation === 'new') { editing = false; }
+      post({ action: target.dataset.explanation });
+    }
+    const pill = event.target.closest('[data-guidance]');
+    if (pill) {
+      const field = $('explanation-guidance');
+      field.value = field.value.trim() ? field.value.trim().replace(/[.;]?$/, '. ') + pill.dataset.guidance : pill.dataset.guidance;
+      edit();
+    }
+  });
+  $('source-menu').addEventListener('keydown', event => {
+    if (event.key === 'Escape' && $('source-menu').open) { event.stopPropagation(); $('source-menu').open = false; $('source-menu').querySelector('summary').focus(); }
+  });
+  $('setup-edit').addEventListener('click', () => {
+    editing = !editing;
+    if (state) { renderSetup(); }
+    if (editing) { goalInput()?.focus(); }
   });
   $('save-guidance').addEventListener('click', () => { if (valid()) { post({ action: 'saveGuidance', text: options().guidance }); } });
   $('confirm-guidance').addEventListener('click', () => post({ action: 'saveGuidance', text: state.pendingGuidance, confirmed: true }));
@@ -84,8 +110,8 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
     const p = item.request, e = p.envelope;
     text('inspector-title', item.current ? 'What will be sent' : 'What was sent / handed off');
     text('inspector-summary', [
-      item.current ? 'Prepared — not sent.' : 'Status: ' + item.status,
-      e.channel, 'Scope: ' + e.privacyScope.replaceAll('_', ' '), 'Complete prompt: ' + e.totalBytes + ' bytes',
+      item.current ? 'Prepared — not sent.' : 'Status: ' + (STATUS[item.status] || item.status),
+      e.channel, 'Scope: ' + scopeLabel(e.privacyScope), 'Complete prompt: ' + e.totalBytes + ' bytes',
       'Sources: ' + e.includedSources.join(', '),
       e.redactions.length ? e.redactions.join('\n') : 'No redactions reported. Detection is not a guarantee that all sensitive text was removed.',
       e.truncated ? 'Some source content was truncated.' : '',
@@ -104,12 +130,27 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
       history.append(note);
       earlier.forEach(t => {
         const details = document.createElement('details'), summary = document.createElement('summary'), pre = document.createElement('pre');
-        summary.textContent = 'Earlier request ' + t.id + ' · ' + t.status;
+        summary.textContent = 'Earlier request · ' + (STATUS[t.status] || t.status);
         pre.textContent = t.request.envelope.prompt + '\n\nAgent response (not verified evidence):\n' + t.text;
         details.append(summary, pre); history.append(details);
       });
     }
     $('inspector-back').focus({ preventScroll: true });
+  }
+  /** Once an answer is done, setup folds into a one-line summary; Edit reopens it. */
+  function renderSetup() {
+    const answered = state.phase === 'done' && state.turns.some(t => t.status === 'done' || t.status === 'handed-off');
+    const collapsed = answered && !editing;
+    $('setup-card').hidden = collapsed;
+    $('setup-summary').hidden = !answered;
+    $('setup-edit').setAttribute('aria-expanded', String(!collapsed));
+    text('setup-edit', collapsed ? 'Edit' : 'Done');
+    const o = options(), source = state.draft?.source;
+    const lines = source ? (source.focus === 'selection' ? ` ${source.startLine}–${source.endLine}` : ' (whole file)') : '';
+    text('setup-summary-text', [goalInput()?.nextElementSibling?.textContent, o.guidance.trim() || 'No guidance', source ? source.label + lines : ''].filter(Boolean).join(' · '));
+    const reason = answered && editing ? 'Change the goal, question, or guidance to explain again, or ask a follow-up below.' : '';
+    $('send-reason').hidden = !reason;
+    text('send-reason', reason);
   }
   window.addEventListener('message', event => {
     if (event.data?.type === 'explanationError') { text('explanation-notice', event.data.error); }
@@ -118,6 +159,7 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
     inspectPrepared,
     render(snapshot) {
       state = snapshot.experience;
+      scopeLabels = snapshot.labels?.scopes || {};
       if (!state) { return; }
       const d = state.draft, p = state.prepared;
       const nextSourceKey = d ? d.source.uri + ':' + d.source.version + ':' + d.session : '';
@@ -129,11 +171,15 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
       if (nextOptionsKey !== optionsKey && !timer) {
         optionsKey = nextOptionsKey;
         const value = d?.options || { goal: 'understand', question: '', guidance: state.savedGuidance || '' };
-        for (const [key, id] of [['goal', 'explanation-goal'], ['question', 'explanation-question'], ['guidance', 'explanation-guidance']]) {
+        if (!$('explanation-goal').contains(document.activeElement)) { setGoal(value.goal); }
+        for (const [key, id] of [['question', 'explanation-question'], ['guidance', 'explanation-guidance']]) {
           if (document.activeElement !== $(id)) { $(id).value = value[key]; }
         }
       }
-      text('goal-description', descriptions[$('explanation-goal').value]);
+      text('goal-description', descriptions[options().goal]);
+      const language = LANGUAGES[snapshot.languageId];
+      $('guidance-language').hidden = !language;
+      if (language) { $('guidance-language').dataset.guidance = `I’m new to ${language}`; text('guidance-language', `New to ${language}`); }
       text('captured-code', snapshot.selection?.selectedText || 'Choose code in your editor.');
       $('source-change').hidden = !state.sourceChanged;
       text('guidance-notice', state.guidanceNotice || '');
@@ -141,14 +187,21 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
       $('remove-guidance').hidden = !state.savedGuidance;
       $('guidance-confirmation').hidden = state.pendingGuidance === undefined;
       text('safe-guidance', state.pendingGuidance || '');
-      text('sharing-summary', p ? 'Destination: ' + p.envelope.channel + '. Context: ' + p.envelope.privacyScope.replaceAll('_', ' ') + '. ' + p.envelope.includedSources.length + ' source(s).' : state.phase === 'preparing' ? 'Preparing permitted context locally…' : 'Choose code to prepare an explanation.');
-      text('preparation-gaps', p ? [...p.gaps, ...p.envelope.redactions].join('\n') : '');
+      const sources = p ? p.envelope.includedSources.length : 0;
+      text('sharing-summary', p
+        ? [p.envelope.channel, scopeLabel(p.envelope.privacyScope), sources + (sources === 1 ? ' source' : ' sources'), p.envelope.redactions.length ? 'sensitive lines hidden' : ''].filter(Boolean).join(' · ')
+        : state.phase === 'preparing' ? 'Preparing permitted context locally…' : 'Choose code in your editor to prepare an explanation.');
+      const notes = p ? [...p.gaps, ...p.envelope.redactions] : [];
+      text('preparation-gaps', notes.join('\n'));
+      $('gaps-details').hidden = !notes.length;
+      text('gaps-summary', notes.length === 1 ? '1 note about what the answer can see' : notes.length + ' notes about what the answer can see');
       $('context-settings').hidden = !p?.gaps.some(gap => gap.includes('privacy scope'));
       text('explanation-notice', state.error || state.notice || '');
       const copyNotice = state.notice || state.guidanceNotice || '';
       if (/copied/i.test(copyNotice)) { text('inspector-status', copyNotice); }
       const busy = ['preparing', 'sending', 'streaming'].includes(state.phase);
-      $('explanation-stop').hidden = !busy;
+      // While an answer streams, its own Stop sits next to it; this one covers preparing.
+      $('explanation-stop').hidden = !busy || state.turns.some(t => ['sending', 'streaming'].includes(t.status));
       const matches = d && JSON.stringify(options()) === JSON.stringify(d.options);
       $('explanation-send').disabled = !p || busy || !valid() || !matches || !!timer || state.phase === 'done';
       $('inspect-prepared').disabled = !p || !!timer || !matches;
@@ -167,18 +220,23 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
           article = document.createElement('article'); article.dataset.turn = String(turn.id);
           const heading = document.createElement('h2'), button = document.createElement('button'), body = document.createElement('div'), status = document.createElement('p'), stop = document.createElement('button');
           heading.textContent = turn.goalLabel + ' · ' + turn.request.draft.source.label;
-          button.className = 'btn'; button.textContent = 'What was sent'; button.addEventListener('click', () => openInspector(state.turns.find(t => t.id === turn.id)));
-          body.className = 'turn-answer'; status.className = 'turn-status muted';
+          heading.className = 'turn-title';
+          button.className = 'link-btn'; button.textContent = 'What was sent'; button.addEventListener('click', () => openInspector(state.turns.find(t => t.id === turn.id)));
+          body.className = 'turn-answer'; status.className = 'turn-status';
+          const meta = document.createElement('div'); meta.className = 'turn-meta'; meta.append(status, button);
           // Stop lives outside the streamed markup so it keeps focus while text arrives.
           stop.className = 'btn turn-stop'; stop.textContent = 'Stop'; stop.dataset.explanation = 'cancel';
-          article.append(heading, button, status, body, stop); answers.append(article);
+          article.append(heading, meta, body, stop); answers.append(article);
         }
         const body = article.querySelector('.turn-answer'), html = renderAnswer(turn, snapshot);
         if (body.dataset.rendered !== html) { body.innerHTML = html; body.dataset.rendered = html; }
-        article.querySelector('.turn-status').textContent = turn.detail || turn.status;
+        article.querySelector('.turn-status').textContent = turn.detail || STATUS[turn.status] || turn.status;
         article.querySelector('.turn-stop').hidden = !['sending', 'streaming'].includes(turn.status);
       });
       $('followup-form').hidden = busy || !state.turns.some(t => t.session === d?.session && t.status === 'done') || !p;
+      if (state.turns.length > lastTurnCount) { editing = false; }
+      lastTurnCount = state.turns.length;
+      renderSetup();
       if (!restored) {
         if (presentation && d && presentation.session === d.session) {
           $('captured-details').open = !!presentation.codeOpen;

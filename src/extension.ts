@@ -10,6 +10,7 @@ import { registerCommands } from './commands/registerCommands';
 import { UpdateChecker } from './update/UpdateChecker';
 import { submitFeedback } from './feedback/submitFeedback';
 import { readFeedbackConfig } from './feedback/feedbackConfig';
+import { PRIVACY_SCOPE_LABELS } from './privacy/privacyScope';
 import {
   DashboardPanel,
   type DashboardState,
@@ -71,6 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
           endLine: d.source.endLine, selectedText: truncateForDisplay(d.source.focus === 'selection' ? d.source.selectedText : d.source.fullText) } : undefined,
         acp: { available: availability.available, detail: availability.detail },
         feedbackConfigured: Boolean(readFeedbackConfig().token),
+        labels: { scopes: PRIVACY_SCOPE_LABELS },
         lastPacket: envelope ? { task: envelope.task, privacyScope: envelope.privacyScope, filePath: envelope.filePath,
           byteSize: envelope.totalBytes, truncated: envelope.truncated, redactions: envelope.redactions,
           promptPreview: envelope.prompt, includedSources: envelope.includedSources, channel: envelope.channel } : undefined,

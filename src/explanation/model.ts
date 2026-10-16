@@ -34,17 +34,17 @@ export interface ExplanationSession {
   draft?: ExplanationDraft; prepared?: PreparedExplanation; turns: ExplanationTurn[];
   error?: string; notice?: string;
 }
-export const GOALS: Record<ExplanationGoal, { label: string; description: string; shape: string }> = {
+export const GOALS: Record<ExplanationGoal, { label: string; short: string; description: string; shape: string }> = {
   understand: {
-    label: 'Understand this code', description: 'Learn its purpose, steps, inputs, and result.',
+    label: 'Understand this code', short: 'Understand', description: 'Learn its purpose, steps, inputs, and result.',
     shape: 'What this does; Main steps; Inputs and result. Explain unfamiliar terms when needed.',
   },
   connections: {
-    label: 'See how it connects', description: 'Follow the relationships supported by your permitted context.',
+    label: 'See how it connects', short: 'Connections', description: 'Follow the relationships supported by your permitted context.',
     shape: 'Role in the project; Demonstrated connections; Inferred connections; Missing context. Do not invent runtime call graphs.',
   },
   investigate: {
-    label: 'Investigate a problem', description: 'Compare observations, possible causes, and checks you can try.',
+    label: 'Investigate a problem', short: 'Investigate', description: 'Compare observations, possible causes, and checks you can try.',
     shape: 'Observed evidence; Possible causes (label each as a hypothesis); Checks to try. Diagnostics are observations, not proof of a cause. Do not run commands or edit code.',
   },
 };

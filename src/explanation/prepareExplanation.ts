@@ -7,6 +7,7 @@ import { findContextGaps } from '../context/contextGaps';
 import { readPrivacyConfig } from '../privacy/PrivacySettings';
 import { applyGuards, isPathBlocked, retainedLineCount, type PrivacyConfig } from '../privacy/privacyGuard';
 import { buildOutboundEnvelope } from '../privacy/OutboundEnvelope';
+import { PRIVACY_SCOPE_LABELS } from '../privacy/privacyScope';
 import { buildPrompt } from '../prompt/promptBuilder';
 import { describeSystemRole, systemRoleBlock } from '../rag/systemRole';
 import type { Retriever } from '../rag/Retriever';
@@ -107,12 +108,12 @@ export function explanationPreparer(fileIndex: FileIndexService, symbolIndex: Sy
     for (const path of roleSources) { if (roleBlock?.includes(path) && !envelope.includedSources.includes(path)) { envelope.includedSources.push(path); } }
     const gaps = findContextGaps({ task: packet.task, hasSymbolName: Boolean(facts?.symbol), hasFacts: Boolean(facts), retrievedCount: retrieved.length,
       truncated: envelope.truncated, hadSecretRedaction: notes.some(n => /secret/i.test(n)), privacyScope: packet.privacyScope });
-    if (goalScope(draft.options.goal, draft.source.focus, 'system_context') !== packet.privacyScope) { gaps.push(`${GOALS[draft.options.goal].label} is limited by your privacy scope (${packet.privacyScope}).`); }
+    if (goalScope(draft.options.goal, draft.source.focus, 'system_context') !== packet.privacyScope) { gaps.push(`${GOALS[draft.options.goal].label} is limited by your privacy scope (${PRIVACY_SCOPE_LABELS[packet.privacyScope]}).`); }
     if (draft.options.goal === 'investigate' && !diagnostics.length) { gaps.push('No captured editor diagnostics. Describe the symptom if you have one.'); }
     if (retrieved.some(r => r.truncated)) { gaps.push('Some related sources are previews, not complete files.'); }
     if (roleBlock) { gaps.push('Module-graph sources include indexed relationship metadata, not necessarily their file contents. The graph may be incomplete; test relationships use naming conventions.'); }
     return { draft, packet: safePacket, envelope, facts, retrieved, roleBlock, roleSources, diagnostics, localExplanation, gaps, settingsKey, delivery, requiresReview: config.showPromptBeforeSending,
-      truth: previous?.truth ?? { sentFilePath: safePacket.filePath, sentCode: code, sentStartLine: packet.startLine, sentEndLine: packet.endLine,
+      truth: previous?.truth ?? { languageId: draft.source.languageId, sentFilePath: safePacket.filePath, sentFileLabel: draft.source.label, sentCode: code, sentStartLine: packet.startLine, sentEndLine: packet.endLine,
         sentSymbol: facts?.symbol, knownFiles: envelope.includedSources, knownSymbols: facts ? [facts.symbol] : [],
         facts: facts ? { symbol: facts.symbol, signature: facts.signature, definition: facts.definition } : undefined, docText: facts?.doc } };
   };

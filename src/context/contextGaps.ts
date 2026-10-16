@@ -10,6 +10,8 @@
  * files, truncation, hidden secret lines), plus a broad command that was
  * deliberately capped by the configured privacy maximum.
  */
+import { PRIVACY_SCOPE_LABELS } from '../privacy/privacyScope';
+
 export interface ContextGapInput {
   task: 'explain_selection' | 'explain_file' | 'explain_system_role';
   /** Did we resolve the enclosing function/type for a selection? */
@@ -34,7 +36,7 @@ export function findContextGaps(input: ContextGapInput): string[] {
     input.privacyScope !== 'system_context'
   ) {
     gaps.push(
-      `System context was capped at ${input.privacyScope} by your privacy setting. Increase the maximum scope to include the wider graph.`,
+      `System context was capped at ${PRIVACY_SCOPE_LABELS[input.privacyScope]} by your privacy setting. Increase the maximum scope to include the wider graph.`,
     );
   }
 

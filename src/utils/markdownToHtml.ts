@@ -7,12 +7,12 @@
  *
  * Safety is the point of doing this locally instead of trusting the model:
  * every piece of source text is HTML-escaped first, and only a fixed set of
- * tags is ever emitted (h3/h4, p, ul/ol/li, strong, em, code, pre, blockquote,
- * a). Links are restricted to http/https. So a model answer can never inject
+ * tags is ever emitted (h3/h4, p, ul/ol/li, table/thead/tbody/tr/th/td, strong,
+ * em, code, pre, blockquote, a). Links are restricted to http/https. So a model answer can never inject
  * markup into the webview.
  *
  * Supported: headings (`#`..`######`), bullet lists (`-` `*` `+`), numbered
- * lists, fenced code blocks, blockquotes, `**bold**`, `*italic*`, `` `code` ``,
+ * lists, GitHub-style tables, fenced code blocks, blockquotes, `**bold**`, `*italic*`, `` `code` ``,
  * and `[text](https://…)`. Underscores are left alone on purpose so `snake_case`
  * and `__dunder__` identifiers are never mangled.
  */
@@ -72,6 +72,24 @@ export function markdownToHtml(md: string): string {
       continue;
     }
 
+    // GitHub-style table: a row with pipes followed by a `---|---` separator.
+    if (line.includes('|') && TABLE_SEPARATOR.test(lines[i + 1] ?? '')) {
+      flushParagraph();
+      const header = tableCells(line);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].includes('|') && !/^\s*$/.test(lines[i])) {
+        rows.push(tableCells(lines[i]));
+        i++;
+      }
+      const cell = (tag: string, text: string): string => `<${tag}>${inline(text)}</${tag}>`;
+      out.push(
+        `<table><thead><tr>${header.map((h) => cell('th', h)).join('')}</tr></thead>` +
+          `<tbody>${rows.map((r) => `<tr>${header.map((_h, c) => cell('td', r[c] ?? '')).join('')}</tr>`).join('')}</tbody></table>`,
+      );
+      continue;
+    }
+
     if (/^\s*[-*+]\s+/.test(line)) {
       flushParagraph();
       const items: string[] = [];
@@ -99,6 +117,33 @@ export function markdownToHtml(md: string): string {
   }
   flushParagraph();
   return out.join('\n');
+}
+
+const TABLE_SEPARATOR = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+/** Split a table row on `|`, ignoring pipes inside code spans or escaped as `\|`. */
+function tableCells(row: string): string[] {
+  const cells: string[] = [];
+  let cell = '';
+  let inCode = false;
+  const text = row.trim().replace(/^\|/, '').replace(/\|$/, '');
+  for (let k = 0; k < text.length; k++) {
+    const ch = text[k];
+    if (ch === '\\' && text[k + 1] === '|') {
+      cell += '|';
+      k++;
+    } else if (ch === '`') {
+      inCode = !inCode;
+      cell += ch;
+    } else if (ch === '|' && !inCode) {
+      cells.push(cell.trim());
+      cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
 }
 
 /** Inline spans. Code spans are pulled out first so emphasis can't reach inside. */

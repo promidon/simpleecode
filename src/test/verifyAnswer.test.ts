@@ -140,6 +140,15 @@ test('verifyAnswer attaches a click-through location to grounded file claims', (
   const result = verifyAnswer('See `ContentView.swift`.', truth);
   const view = result.claims.find((c) => c.text === 'ContentView.swift');
   assert.equal(view?.location?.path, '/repo/src/ContentView.swift');
+  assert.equal(view?.location?.label, 'ContentView.swift'); // no sentFileLabel: basename, never the absolute path
+});
+
+test('verifyAnswer labels the sent file workspace-relative', () => {
+  const result = verifyAnswer('See `ContentView.swift`, line 80.', { ...truth, sentFileLabel: 'src/ContentView.swift' });
+  for (const claim of result.claims) {
+    assert.equal(claim.location?.label, 'src/ContentView.swift');
+    assert.equal(claim.location?.path, '/repo/src/ContentView.swift');
+  }
 });
 
 test('verifyAnswer attaches file + line to in-range line claims, not to out-of-range', () => {
@@ -148,7 +157,24 @@ test('verifyAnswer attaches file + line to in-range line claims, not to out-of-r
   const outRange = result.claims.find((c) => c.text.includes('200'));
   assert.deepEqual(inRange?.location, {
     path: '/repo/src/ContentView.swift',
+    label: 'ContentView.swift',
     line: 80,
   });
   assert.equal(outRange?.location, undefined);
+});
+
+test('language keywords and literals are not claims about the project', () => {
+  const result = verifyAnswer(
+    'It is an `enum` with no cases, not a `struct`; `nil` means missing. It calls `Ghost`.',
+    { ...truth, languageId: 'swift' },
+  );
+  assert.deepEqual(result.claims.map((c) => c.text), ['Ghost']);
+  assert.equal(result.unverified, 1);
+});
+
+test('keyword skipping is per language and ignores prototype names', () => {
+  const ts = verifyAnswer('Use `struct` and `constructor`.', { ...truth, languageId: 'typescript' });
+  assert.deepEqual(ts.claims.map((c) => c.text), ['struct', 'constructor']);
+  const unknown = verifyAnswer('Returns `null` or `guard`.', { ...truth, languageId: 'python' });
+  assert.deepEqual(unknown.claims.map((c) => c.text), ['guard']);
 });

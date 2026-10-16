@@ -56,3 +56,25 @@ test('renders a blockquote', () => {
 test('empty input yields empty output', () => {
   assert.equal(markdownToHtml(''), '');
 });
+
+test('renders a GitHub-style table with escaped, inline-formatted cells', () => {
+  const html = markdownToHtml(
+    'Constants:\n\n| Constant | Purpose |\n|---|:---:|\n| `relayURL` | Sends **push** notifications |\n| `a || b` | <img src=x> |',
+  );
+  assert.match(html, /<table><thead><tr><th>Constant<\/th><th>Purpose<\/th><\/tr><\/thead>/);
+  assert.match(html, /<td><code>relayURL<\/code><\/td><td>Sends <strong>push<\/strong> notifications<\/td>/);
+  assert.match(html, /<td><code>a \|\| b<\/code><\/td>/); // pipes inside code spans stay in the cell
+  assert.doesNotMatch(html, /<img/);
+  assert.match(html, /&lt;img src=x&gt;/);
+});
+
+test('a table row with fewer cells is padded to the header width', () => {
+  const html = markdownToHtml('| A | B |\n| --- | --- |\n| only a |');
+  assert.match(html, /<tr><td>only a<\/td><td><\/td><\/tr>/);
+});
+
+test('a lone pipe in prose stays a paragraph', () => {
+  const html = markdownToHtml('Use a | b when either works.\nNext line.');
+  assert.doesNotMatch(html, /<table>/);
+  assert.match(html, /<p>Use a \| b when either works\. Next line\.<\/p>/);
+});

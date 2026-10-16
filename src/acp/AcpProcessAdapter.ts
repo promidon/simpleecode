@@ -12,6 +12,7 @@ import {
   type AcpMessage,
   agentTextFromUpdate,
   cancelNotification,
+  describeStopReason,
   encodeMessage,
   errorResponse,
   initializeRequest,
@@ -96,16 +97,12 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
       if (response.error) {
         return {
           delivery: 'failed',
-          detail: `ACP agent error: ${response.error.message}`,
+          detail: `The agent reported an error: ${response.error.message}`,
         };
       }
-      const reason = stopReasonOf(response.result);
       return {
         delivery: 'agent',
-        detail:
-          reason === 'cancelled'
-            ? 'Stopped — showing the partial answer received so far.'
-            : `Answer received from the ACP agent (${reason}).`,
+        detail: describeStopReason(stopReasonOf(response.result)),
         answer,
       };
     } catch (err) {

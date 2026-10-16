@@ -19,17 +19,19 @@ const { parseDashboardMessage } = require('../../out/dashboard/dashboardMessages
 const { GOALS } = require('../../out/explanation/model');
 const { markdownToHtml } = require('../../out/utils/markdownToHtml');
 
-async function mount(page, review = false, hasSource = true, streaming = false) {
+let h_answer = 'A short explanation.';
+async function mount(page, review = false, hasSource = true, streaming = false, fixture = {}) {
   const sent = [], messages = [], errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  const source = { uri: 'file:///fixture/AudioManager.tsx', filePath: '/fixture/AudioManager.tsx', label: 'src/AudioManager.tsx',
+  const source = fixture.source || { uri: 'file:///fixture/AudioManager.tsx', filePath: '/fixture/AudioManager.tsx', label: 'src/AudioManager.tsx',
     version: 1, languageId: 'typescriptreact', fullText: 'function AudioDataBar() { return <div />; }',
     selectedText: 'return <div />;', startLine: 2, endLine: 2, startCharacter: 2, endCharacter: 16, focus: 'selection', diagnostics: [] };
   let savedGuidance = '', updateChunk, finish;
   const render = async () => {
     if (page.isClosed()) { return; }
     const x = coordinator.state, p = x.prepared;
-    const snapshot = { phase: x.phase, activeFile: source.label, selection: { hasSelection: true, startLine: 2, endLine: 2, selectedText: source.selectedText },
+    const snapshot = { phase: x.phase, activeFile: source.label, languageId: source.languageId, labels: { scopes: { selection_only: 'selection only' } },
+      selection: { hasSelection: true, startLine: source.startLine, endLine: source.endLine, selectedText: source.selectedText },
       acp: { available: true, detail: 'Fake transport' }, index: { files: 3 },
       experience: { ...x, savedGuidance, guidanceNotice: '', sourceChanged: false,
         turns: x.turns.map(t => ({ ...t, html: markdownToHtml(t.text), goalLabel: GOALS[t.request.draft.options.goal].label })) },
@@ -41,12 +43,13 @@ async function mount(page, review = false, hasSource = true, streaming = false) 
       const packet = buildContextPacket(draft, DEFAULT_PRIVACY_CONFIG);
       const prompt = buildPrompt(packet, [], 'standard', undefined, undefined, undefined, draft.options);
       return { draft, packet, envelope: buildOutboundEnvelope(packet, prompt, [], 'Fake ACP agent'), retrieved: [], gaps: [], settingsKey: 'fixture', delivery: 'agent', requiresReview: review,
-        truth: previous?.truth || { sentCode: packet.selectedText, knownFiles: ['src/AudioManager.tsx'], knownSymbols: [] } };
+        truth: previous?.truth || { languageId: source.languageId, sentFilePath: source.filePath, sentFileLabel: source.label, sentStartLine: source.startLine, sentEndLine: source.endLine,
+          sentCode: packet.selectedText, knownFiles: ['src/AudioManager.tsx'], knownSymbols: [] } };
     },
     async send(request, chunk) {
-      sent.push(request.envelope.prompt); updateChunk = chunk; chunk('A short explanation.');
+      sent.push(request.envelope.prompt); updateChunk = chunk; chunk(fixture.firstChunk || 'A short explanation.');
       if (streaming) { await new Promise(resolve => { finish = resolve; }); }
-      return { delivery: 'agent', detail: 'Fixture answer complete.', answer: 'A short explanation.' };
+      return { delivery: 'agent', detail: 'Answer complete.', answer: fixture.answer || h_answer };
     },
     async copy(prompt) { messages.push({ copied: prompt }); }, reset() {}, settingsKey: () => 'fixture', changed() { void render(); },
   });
@@ -175,14 +178,15 @@ test('oversized guidance is inline; state updates keep caret, text and scroll', 
 test('streaming preserves focus and disclosure; Stop retains incomplete text and rejects late output', async ({ page }) => {
   const h = await mount(page, false, true, true);
   await page.locator('#explanation-send').click();
-  await expect(page.locator('#explanation-stop')).toBeVisible();
+  await expect(page.locator('.turn-stop')).toBeVisible();
+  await expect(page.locator('#explanation-stop')).toBeHidden(); // one Stop: the one next to the answer
   await page.locator('#captured-details summary').click();
   await page.locator('#explanation-guidance').focus();
   h.lateChunk('A longer streamed explanation.');
   await expect(page.locator('#explain-content')).toContainText('A longer streamed explanation.');
   await expect(page.locator('#explanation-guidance')).toBeFocused();
   await expect(page.locator('#captured-details')).toHaveAttribute('open', '');
-  await page.locator('#explanation-stop').click();
+  await page.locator('.turn-stop').click();
   await expect(page.locator('#explain-content')).toContainText('incomplete');
   await expect(page.locator('#answer-live')).toContainText('incomplete');
   h.lateChunk('WRONG LATE OUTPUT'); h.finish();
@@ -236,3 +240,87 @@ test('re-rendered controls keep focus: stream Stop, tour Next, and the overflow 
   expect(h.messages.some(m => m.type === 'openExternal' && m.url.endsWith('/issues/new/choose'))).toBeTruthy();
   expect(h.errors).toEqual([]);
 });
+
+test('sources are workspace-relative, grouped per file, and keywords are not flagged', async ({ page }) => {
+  h_answer = 'A short explanation. See `AudioManager.tsx`; line 2 returns a `const`-free `null`, not `Ghost`.';
+  try {
+    const h = await mount(page);
+    await page.locator('#explanation-send').click();
+    const sources = page.locator('#explain-content .sources');
+    await expect(sources).toContainText('src/AudioManager.tsx');
+    await expect(sources).not.toContainText('/fixture/');
+    await expect(sources.locator('.source-group')).toHaveCount(1);
+    await expect(sources.locator('[data-line="2"]')).toHaveAttribute('aria-label', 'src/AudioManager.tsx line 2');
+    const flagged = page.locator('#explain-content .claim-row');
+    await expect(flagged).toHaveCount(1);
+    await expect(flagged).toContainText('Ghost');
+    expect(h.errors).toEqual([]);
+  } finally {
+    h_answer = 'A short explanation.';
+  }
+});
+
+test('setup folds into a summary after an answer; Edit reopens it; goal and pills drive the request', async ({ page }) => {
+  const h = await mount(page);
+  await page.locator('input[name="explanation-goal"][value="investigate"]').check();
+  await expect(page.locator('#goal-description')).toContainText('possible causes');
+  await page.getByRole('button', { name: 'ELI5' }).click();
+  await expect(page.locator('#explanation-guidance')).toHaveValue('ELI5');
+  await page.getByRole('button', { name: 'New to TypeScript' }).click();
+  await expect(page.locator('#explanation-guidance')).toHaveValue('ELI5. I’m new to TypeScript');
+  await expect(page.locator('#explanation-send')).toBeEnabled();
+  await page.locator('#explanation-send').click();
+  await expect.poll(() => h.sent.length).toBe(1);
+  expect(h.sent[0]).toContain('I’m new to TypeScript');
+  await expect(page.locator('#setup-card')).toBeHidden();
+  await expect(page.locator('#setup-summary')).toBeVisible();
+  await expect(page.locator('#setup-summary-text')).toHaveText('Investigate · ELI5. I’m new to TypeScript · src/AudioManager.tsx 2–2');
+  await page.locator('#setup-edit').click();
+  await expect(page.locator('#setup-card')).toBeVisible();
+  await expect(page.locator('#setup-edit')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('input[name="explanation-goal"][value="investigate"]')).toBeFocused();
+  await expect(page.locator('#send-reason')).toBeVisible();
+  await page.locator('#setup-edit').click();
+  await expect(page.locator('#setup-card')).toBeHidden();
+  expect(h.errors).toEqual([]);
+});
+
+// Design-review screenshots: SCREENSHOTS=<output dir> npx playwright test -g screenshots
+const APPCONFIG = {
+  source: { uri: 'file:///Users/me/Developer/demo-app/DemoApp/App/AppConfig.swift', filePath: '/Users/me/Developer/demo-app/DemoApp/App/AppConfig.swift',
+    label: 'DemoApp/App/AppConfig.swift', version: 1, languageId: 'swift', startLine: 1, endLine: 48, startCharacter: 0, endCharacter: 1, focus: 'selection', diagnostics: [],
+    fullText: 'enum AppConfig {\n  static let apiURL = URL(string: "https://example.test/api")!\n}',
+    selectedText: 'enum AppConfig {\n  static let apiURL = URL(string: "https://example.test/api")!\n}' },
+  firstChunk: '## AppConfig — the app\'s settings drawer\n\nThink of `AppConfig` like an organized drawer',
+  answer: [
+    '## AppConfig — the app\'s settings drawer', '',
+    'Think of `AppConfig` like an organized drawer: every setting and address the app needs, in one place.', '',
+    '### Why an `enum` with no cases?', '',
+    '`AppConfig` is an `enum` with zero cases, so nobody can create one by accident. It is a namespace, not a `struct`, and a missing value falls back instead of `nil`.', '',
+    '### Server URLs and keys (lines 16–23)', '',
+    '| Constant | Purpose |', '|---|---|', '| `apiURL` | Base address for API requests |', '| `feedURL` | Loads the home feed |', '| `imageURL` | Serves resized images |', '',
+    'See line 6, line 8, and line 16 in `AppConfig.swift`.',
+  ].join('\n'),
+};
+for (const theme of ['vscode-dark', '', 'vscode-high-contrast']) {
+  for (const width of [320, 360]) {
+    test(`screenshots ${theme || 'light'} ${width}px`, async ({ page }) => {
+      test.skip(!process.env.SCREENSHOTS, 'design screenshots only');
+      // Outside test-results/, which Playwright clears on every run.
+      await page.setViewportSize({ width, height: 1500 });
+      const h = await mount(page, false, true, true, APPCONFIG);
+      await page.evaluate(theme => document.body.className = theme, theme);
+      const name = `${process.env.SCREENSHOTS}/${theme || 'light'}-${width}`;
+      await page.locator('#explanation-guidance').fill('ELI5');
+      await expect(page.locator('#explanation-send')).toBeEnabled();
+      await page.screenshot({ path: `${name}-1-prepared.png` });
+      await page.locator('#explanation-send').click();
+      await expect(page.locator('.turn-stop')).toBeVisible();
+      await page.screenshot({ path: `${name}-2-streaming.png` });
+      h.finish();
+      await expect(page.locator('#setup-summary')).toBeVisible();
+      await page.screenshot({ path: `${name}-3-answered.png` });
+      expect(h.errors).toEqual([]);
+    });
+  }
+}

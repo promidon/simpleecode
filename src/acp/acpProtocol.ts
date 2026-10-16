@@ -140,3 +140,21 @@ export function stopReasonOf(result: unknown): string {
   const reason = (result as { stopReason?: unknown })?.stopReason;
   return typeof reason === 'string' ? reason : 'unknown';
 }
+
+/** Plain-language status for an ACP stop reason (never the raw protocol value). */
+export function describeStopReason(reason: string): string {
+  switch (reason) {
+    case 'end_turn':
+      return 'Answer complete.';
+    case 'cancelled':
+      return 'Stopped — showing the partial answer received so far.';
+    case 'max_tokens':
+      return 'The answer hit the length limit and may be cut off.';
+    case 'max_turn_requests':
+      return 'The agent stopped after too many steps. The answer may be incomplete.';
+    case 'refusal':
+      return 'The agent declined to answer.';
+    default:
+      return 'The agent finished.';
+  }
+}
