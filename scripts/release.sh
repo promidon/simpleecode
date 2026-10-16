@@ -91,12 +91,13 @@ deploy() {
     --no-build
     --message "SimpleeCode ${VERSION} ${mode}"
   )
-  node scripts/verify-release.mjs
-  netlify status >/dev/null
-
   if [ "${mode}" = "production" ]; then
+    node scripts/verify-release.mjs --production
     deploy_args+=(--prod)
+  else
+    node scripts/verify-release.mjs
   fi
+  netlify status >/dev/null
 
   echo "→ Deploying SimpleeCode ${VERSION} to Netlify (${mode})"
   netlify deploy "${deploy_args[@]}"

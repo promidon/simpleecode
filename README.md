@@ -113,6 +113,18 @@ SimpleeCode runs locally and is careful about what leaves your machine.
 
 See `simpleecode.privacy.*` in **Settings → SimpleeCode**.
 
+### Website analytics
+
+The extension sends no analytics. The website
+([simpleecode.netlify.app](https://simpleecode.netlify.app)) uses Google
+Analytics only if you choose **Allow analytics**. Nothing loads from Google
+before then. When allowed, it records a fixed set of page, demo, scroll, and
+download events. It never sends source code, extension activity, filenames,
+form content, free text, query strings, or URL fragments. Your choice and the
+visitor cookie expire after six months; event data is kept for two months.
+Change your choice any time from
+[Analytics settings](https://simpleecode.netlify.app/#analytics-settings).
+
 ---
 
 ## Get involved

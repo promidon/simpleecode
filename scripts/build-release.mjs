@@ -57,7 +57,6 @@ if (expectedSha256 && sha256 !== expectedSha256) {
 
 rmSync(publish, { recursive: true, force: true });
 cpSync(resolve(root, 'site'), publish, { recursive: true });
-rmSync(resolve(publish, 'principles'), { recursive: true, force: true });
 mkdirSync(resolve(publish, 'assets', 'fonts'), { recursive: true });
 copyFileSync(
   resolve(root, 'media', 'simpleecode-icon.svg'),

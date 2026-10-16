@@ -9,8 +9,9 @@
     <link rel="icon" href="/assets/simpleecode-icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/styles.css">
     <script src="/site.js" defer></script>
+    <script src="/analytics.js" defer></script>
   </head>
-  <body>
+  <body data-analytics-page="not_found">
     <main class="error-page">
       <div class="hero-grid" aria-hidden="true"></div>
       <a class="brand" href="/" aria-label="SimpleeCode home">
@@ -23,8 +24,9 @@
         <p class="lede">The link may be old, or the address may have been typed incorrectly.</p>
         <div class="actions">
           <a class="button primary" href="/">Go to SimpleeCode</a>
-          <a class="button quiet" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__">Download the latest VSIX</a>
+          <a class="button quiet" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__" data-analytics-cta="download_vsix" data-analytics-placement="not_found">Download the latest VSIX</a>
         </div>
+        <p class="error-note"><a href="/#analytics-settings">Analytics settings</a></p>
       </div>
     </main>
   </body>
