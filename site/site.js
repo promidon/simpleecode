@@ -29,7 +29,6 @@
     const isDark = theme === 'dark';
     root.dataset.theme = isDark ? 'dark' : 'light';
     themeButton?.setAttribute('aria-pressed', String(isDark));
-    themeButton?.setAttribute('aria-label', isDark ? 'Switch to light theme' : 'Switch to dark theme');
     if (themeColor) themeColor.content = isDark ? '#0e110f' : '#f6f4ef';
   }
 
@@ -44,19 +43,24 @@
   const productDemoButtons = [...document.querySelectorAll('[data-product-demo]')];
   const productDemoPanels = [...document.querySelectorAll('[data-product-panel]')];
 
-  function openProductDemo(button) {
-    for (const button of productDemoButtons) button.setAttribute('aria-expanded', 'false');
-    for (const panel of productDemoPanels) panel.hidden = true;
-
-    const panel = productDemoPanels.find((item) => item.dataset.productPanel === button.dataset.productDemo);
-    if (!panel) return;
-    button.setAttribute('aria-expanded', 'true');
-    panel.hidden = false;
+  function openProductDemo(selected) {
+    for (const button of productDemoButtons) {
+      const isSelected = button === selected;
+      button.setAttribute('aria-selected', String(isSelected));
+      button.tabIndex = isSelected ? 0 : -1;
+    }
+    for (const panel of productDemoPanels) panel.hidden = panel.dataset.productPanel !== selected.dataset.productDemo;
   }
 
-  for (const button of productDemoButtons) {
-    button.addEventListener('click', () => {
-      openProductDemo(button);
+  for (const [index, button] of productDemoButtons.entries()) {
+    button.addEventListener('click', () => openProductDemo(button));
+    button.addEventListener('keydown', (event) => {
+      const last = productDemoButtons.length - 1;
+      const target = { ArrowRight: index === last ? 0 : index + 1, ArrowLeft: index === 0 ? last : index - 1, Home: 0, End: last }[event.key];
+      if (target === undefined) return;
+      event.preventDefault();
+      productDemoButtons[target].focus();
+      productDemoButtons[target].click();
     });
   }
 
@@ -126,10 +130,10 @@
     setSelectionExplanationOpen(!isOpen);
   });
 
-  document.addEventListener('keydown', (event) => {
+  explainDemoButton?.closest('.selection-demo')?.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape' || selectionExplanation?.hidden !== false) return;
     setSelectionExplanationOpen(false);
-    explainDemoButton?.focus();
+    explainDemoButton.focus();
   });
 
   const reveals = [...document.querySelectorAll('[data-reveal]')];
@@ -162,21 +166,4 @@
     scrollFrame = window.requestAnimationFrame(updateScrollState);
   }, { passive: true });
   updateScrollState();
-
-  const precisePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
-  if (precisePointer.matches && !motionQuery.matches) {
-    for (const card of document.querySelectorAll('.tilt')) {
-      card.addEventListener('pointermove', (event) => {
-        const bounds = card.getBoundingClientRect();
-        const x = (event.clientX - bounds.left) / bounds.width - 0.5;
-        const y = (event.clientY - bounds.top) / bounds.height - 0.5;
-        card.style.setProperty('--tilt-x', `${(-y * 2.4).toFixed(2)}deg`);
-        card.style.setProperty('--tilt-y', `${(x * 3).toFixed(2)}deg`);
-      });
-      card.addEventListener('pointerleave', () => {
-        card.style.setProperty('--tilt-x', '0deg');
-        card.style.setProperty('--tilt-y', '0deg');
-      });
-    }
-  }
 })();

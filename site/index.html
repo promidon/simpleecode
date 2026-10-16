@@ -18,10 +18,26 @@
     <link rel="icon" href="/assets/simpleecode-icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/styles.css">
     <script src="/site.js" defer></script>
+    <script src="/analytics.js" defer></script>
   </head>
-  <body>
+  <body data-analytics-page="home">
     <a class="skip-link" href="#main">Skip to main content</a>
     <div class="scroll-progress" aria-hidden="true"></div>
+
+    <p class="visually-hidden" data-analytics-announcement aria-live="polite"></p>
+    <section class="analytics-consent" data-analytics-consent aria-labelledby="analytics-consent-title" hidden>
+      <button class="analytics-close" type="button" data-analytics-close aria-label="Close analytics settings" hidden>×</button>
+      <div>
+        <p class="eyebrow">Your choice</p>
+        <h2 id="analytics-consent-title" tabindex="-1">Optional website analytics</h2>
+        <p>Allow limited page, demo, scroll, and download events to help improve this website. Nothing goes to Google Analytics until you allow it. This never measures what the VS Code extension does.</p>
+        <p class="analytics-current" data-analytics-current></p>
+      </div>
+      <div class="analytics-actions">
+        <button type="button" data-analytics-allow>Allow analytics</button>
+        <button type="button" data-analytics-deny>No thanks</button>
+      </div>
+    </section>
 
     <header class="site-header" data-site-header>
       <div class="header-inner">
@@ -38,7 +54,7 @@
           <a href="#install">Install</a>
         </nav>
 
-        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light theme" aria-pressed="true">
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Dark theme" aria-pressed="true">
           <span class="theme-dot" aria-hidden="true"></span>
         </button>
       </div>
@@ -55,13 +71,13 @@
           <h1 id="hero-title">Understand the code<br><em>AI wrote</em> before<br>you trust it</h1>
           <p class="lede">SimpleeCode finds the real symbols, types, imports, and relationships in your project—then explains them in plain language with links back to the source.</p>
           <div class="actions">
-            <a class="button primary magnetic" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__">Download SimpleeCode <span aria-hidden="true">↓</span></a>
-            <a class="button quiet" href="https://github.com/promidon/simpleecode">View source <span aria-hidden="true">→</span></a>
+            <a class="button primary" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__" data-analytics-cta="download_vsix" data-analytics-placement="hero">Download SimpleeCode <span aria-hidden="true">↓</span></a>
+            <a class="button quiet" href="https://github.com/promidon/simpleecode" data-analytics-cta="view_source" data-analytics-placement="hero">View source <span aria-hidden="true">→</span></a>
           </div>
-          <p class="download-note">Version __SIMPLEECODE_VERSION__ · No account · GPL-3.0-or-later</p>
+          <p class="download-note">VSIX for VS Code · Version __SIMPLEECODE_VERSION__ · No SimpleeCode account · GPL-3.0-or-later</p>
         </div>
 
-        <figure class="editor-stage tilt" data-reveal>
+        <figure class="editor-stage" data-reveal>
           <div class="vscode-window">
             <div class="vscode-titlebar" aria-hidden="true">
               <span class="traffic-lights"><i></i><i></i><i></i></span>
@@ -112,28 +128,28 @@
                 <div class="terminal-panel">
                   <div class="terminal-tabs"><span>PROBLEMS</span><span>OUTPUT</span><span class="active">TERMINAL</span><span>PORTS</span></div>
                   <div class="terminal-line"><span>simpleecode %</span> npm test</div>
-                  <div class="terminal-line terminal-pass">✓ 191 tests passed</div>
+                  <div class="terminal-line terminal-pass">✓ All tests passed</div>
                 </div>
               </section>
 
               <section class="simplee-panel" aria-label="Interactive SimpleeCode product preview">
                 <div class="simplee-tabbar" aria-hidden="true"><span class="active">SIMPLEECODE</span><span>AGENT</span><span>CODEX</span><b>×</b></div>
                 <div class="simplee-toolbar">
-                  <strong><span class="search-mark">⌕</span> SimpleeCode</strong>
+                  <strong><span class="search-mark" aria-hidden="true">⌕</span> SimpleeCode</strong>
                   <span class="index-status"><i></i> Indexed · ACP ready</span>
-                  <span class="simplee-tabs" role="group" aria-label="Product demonstrations">
-                    <button type="button" data-product-demo="tour" aria-controls="product-demo-tour" aria-expanded="false">Tour</button>
-                    <button type="button" data-product-demo="explain" aria-controls="product-demo-explain" aria-expanded="false">Explain</button>
-                    <button type="button" data-product-demo="check" aria-controls="product-demo-check" aria-expanded="false">Check</button>
+                  <span class="simplee-tabs" role="tablist" aria-label="Product demonstrations">
+                    <button type="button" role="tab" id="product-tab-tour" data-product-demo="tour" data-analytics-cta="demo_tour" data-analytics-placement="product" data-analytics-demo="tour" aria-controls="product-demo-tour" aria-selected="false">Tour</button>
+                    <button type="button" role="tab" id="product-tab-explain" data-product-demo="explain" data-analytics-cta="demo_explain" data-analytics-placement="product" data-analytics-demo="explain" aria-controls="product-demo-explain" aria-selected="false">Explain</button>
+                    <button type="button" role="tab" id="product-tab-check" data-product-demo="check" data-analytics-cta="demo_check" data-analytics-placement="product" data-analytics-demo="check" aria-controls="product-demo-check" aria-selected="false">Check</button>
                   </span>
                   <span class="more" aria-hidden="true">•••</span>
                 </div>
-                <div class="product-demo-stage" aria-live="polite">
+                <div class="product-demo-stage">
                   <div class="product-demo-fallback">
                     <strong>Three ways to understand the code</strong>
                     <p>Tour finds where to start. Explain breaks down selected code. Check shows which claims the source supports.</p>
                   </div>
-                  <div class="product-demo-panel tour-panel" id="product-demo-tour" data-product-panel="tour" hidden>
+                  <div class="product-demo-panel tour-panel" id="product-demo-tour" data-product-panel="tour" role="tabpanel" aria-labelledby="product-tab-tour" tabindex="0" hidden>
                     <span class="tour-icon" aria-hidden="true">⌕</span>
                     <strong>Codebase tour</strong>
                     <p>Start with the files that explain the rest of the project.</p>
@@ -144,19 +160,19 @@
                     </ol>
                   </div>
 
-                  <div class="product-demo-panel explain-panel" id="product-demo-explain" data-product-panel="explain" hidden>
+                  <div class="product-demo-panel explain-panel" id="product-demo-explain" data-product-panel="explain" role="tabpanel" aria-labelledby="product-tab-explain" tabindex="0" hidden>
                     <div class="demo-panel-heading"><span aria-hidden="true">✦</span><div><strong>Explain selection</strong><small>extension.ts · lines 4–7</small></div></div>
                     <p>This function starts the extension. It builds the local code index first, then registers the commands that use it.</p>
                     <div class="demo-facts"><span>activate() function</span><span>2 verified calls</span><span>Beginner mode</span></div>
-                    <span class="demo-source-link">Open the source →</span>
+                    <span class="demo-source-link">Open the source <span aria-hidden="true">→</span></span>
                   </div>
 
-                  <div class="product-demo-panel check-panel" id="product-demo-check" data-product-panel="check" hidden>
+                  <div class="product-demo-panel check-panel" id="product-demo-check" data-product-panel="check" role="tabpanel" aria-labelledby="product-tab-check" tabindex="0" hidden>
                     <div class="demo-panel-heading"><span aria-hidden="true">✓</span><div><strong>Answer check</strong><small>3 claims inspected</small></div></div>
                     <ul>
                       <li><span class="demo-grounded">✓</span><div><b>Grounded</b><small>The local index is built before commands register.</small></div></li>
                       <li><span class="demo-grounded">✓</span><div><b>Grounded</b><small>The function is exported from extension.ts.</small></div></li>
-                      <li><span class="demo-review">?</span><div><b>Needs review</b><small>No source supports a startup-time claim.</small></div></li>
+                      <li><span class="demo-review">?</span><div><b>Unverified</b><small>No source supports a startup-time claim.</small></div></li>
                     </ul>
                   </div>
                 </div>
@@ -173,7 +189,7 @@
       <section class="language-section" aria-labelledby="language-title">
         <div data-reveal>
           <p class="eyebrow">Language support</p>
-          <h2 id="language-title">Focused on<br>Swift and TypeScript...<br>for now</h2>
+          <h2 id="language-title">Focused on<br>Swift and TypeScript…<br>for now</h2>
         </div>
         <div class="language-copy" data-reveal>
           <p>SimpleeCode’s language-aware work currently focuses on <strong>Swift—including SwiftUI—and TypeScript</strong>. JavaScript uses the same indexing path as TypeScript.</p>
@@ -189,7 +205,7 @@
         </div>
 
         <div class="flow-showcase" id="how-it-works">
-          <article class="flow-card tilt" data-reveal>
+          <article class="flow-card" data-reveal>
             <div class="flow-copy">
               <span class="flow-number">01 / Tour</span>
               <h3>Tour an unfamiliar project</h3>
@@ -198,11 +214,11 @@
             <div class="tour-demo" data-tour-demo role="group" aria-label="Interactive codebase tour example">
               <div class="tour-path" aria-hidden="true"><span class="done" data-tour-step>✓</span><i></i><span class="active" data-tour-step>2</span><i></i><span data-tour-step>3</span><i></i><span data-tour-step>4</span></div>
               <div class="tour-file" aria-live="polite"><small>Now touring</small><strong data-tour-file-name>src/extension.ts</strong><p data-tour-file-description>The entry point that registers commands and opens the SimpleeCode dashboard.</p></div>
-              <div class="tour-controls"><span data-tour-position>2 of 4 files</span><button class="demo-control tour-next" type="button" data-tour-next><span data-tour-next-label>Next file</span><span data-tour-next-icon aria-hidden="true">→</span></button></div>
+              <div class="tour-controls"><span data-tour-position>2 of 4 files</span><button class="demo-control tour-next" type="button" data-tour-next data-analytics-cta="tour_next" data-analytics-placement="product" data-analytics-demo="tour"><span data-tour-next-label>Next file</span><span data-tour-next-icon aria-hidden="true">→</span></button></div>
             </div>
           </article>
 
-          <article class="flow-card tilt" data-reveal>
+          <article class="flow-card" data-reveal>
             <div class="flow-copy">
               <span class="flow-number">02 / Explain</span>
               <h3>Explain the code in front of you</h3>
@@ -214,7 +230,7 @@
 <span>19</span>   <mark>validateOrder(order)</mark>
 <span>20</span>   <mark>return gateway.capture(order.total)</mark>
 <span>21</span> }</code></pre>
-              <div class="selection-action"><span>3 lines selected</span><button class="demo-control explain-trigger" type="button" data-explain-demo aria-controls="selection-explanation" aria-expanded="false"><span data-explain-label>Explain selection</span><kbd>⌘↵</kbd></button></div>
+              <div class="selection-action"><span>3 lines selected</span><button class="demo-control explain-trigger" type="button" data-explain-demo data-analytics-cta="explain_selection" data-analytics-placement="product" data-analytics-demo="explain" aria-controls="selection-explanation" aria-expanded="false"><span data-explain-label>Explain selection</span></button></div>
               <div class="selection-result" id="selection-explanation" data-selection-explanation aria-live="polite" hidden>
                 <small>SimpleeCode explanation</small>
                 <strong>charge(order)</strong>
@@ -224,16 +240,16 @@
             </div>
           </article>
 
-          <article class="flow-card tilt" data-reveal>
+          <article class="flow-card" data-reveal>
             <div class="flow-copy">
               <span class="flow-number">03 / Check</span>
               <h3>Check the answer against the source</h3>
-              <p>Grounded claims link to the real file and line. Unsupported claims are marked for review.</p>
+              <p>Grounded claims link to the real file and line. Unsupported claims are marked unverified for your review.</p>
             </div>
-            <div class="check-demo" aria-hidden="true">
-              <div class="claim grounded"><span>✓</span><div><strong>Grounded</strong><p>“The updater verifies a SHA-256 checksum.”</p></div><small>updater.ts:82</small></div>
-              <div class="claim review"><span>?</span><div><strong>Needs review</strong><p>“The request can never time out.”</p></div><small>No supporting fact</small></div>
-              <div class="claim grounded"><span>✓</span><div><strong>Grounded</strong><p>“Startup checks are off by default.”</p></div><small>package.json:196</small></div>
+            <div class="check-demo">
+              <div class="claim grounded"><span aria-hidden="true">✓</span><div><strong>Grounded</strong><p>“The updater verifies a SHA-256 checksum.”</p></div><small>updater.ts:82</small></div>
+              <div class="claim review"><span aria-hidden="true">?</span><div><strong>Unverified</strong><p>“The request can never time out.”</p></div><small>No supporting fact</small></div>
+              <div class="claim grounded"><span aria-hidden="true">✓</span><div><strong>Grounded</strong><p>“Startup checks are off by default.”</p></div><small>package.json:196</small></div>
             </div>
           </article>
         </div>
@@ -263,8 +279,8 @@
           <article>
             <span class="truth-step">03</span>
             <h3>SimpleeCode checks it</h3>
-            <p>File and line claims become source links. Claims without enough support are marked for your review.</p>
-            <div class="check-count"><strong>2</strong> grounded <span>1 needs review</span></div>
+            <p>File and line claims become source links. Claims without enough support are marked unverified for your review.</p>
+            <div class="check-count"><strong>2</strong> grounded <span>1 unverified</span></div>
           </article>
         </div>
       </section>
@@ -275,16 +291,17 @@
           <p class="eyebrow">Privacy you can inspect</p>
           <h2 id="privacy-title">See what will<br><em>be sent</em></h2>
           <p>By default, SimpleeCode shows the complete prompt before sending it. Sensitive paths are blocked, secret-looking lines are removed, and you make the final decision.</p>
-          <a class="text-link" href="https://github.com/promidon/simpleecode#privacy">Read the privacy model <span aria-hidden="true">→</span></a>
+          <p><strong>Website analytics are optional.</strong> If you allow them, limited page and interaction events go to Google Analytics. The site never sends source code, extension activity, filenames, form content, or free text. Consent and the visitor cookie expire after six months; GA4 event retention is two months.</p>
+          <a class="text-link" href="https://github.com/promidon/simpleecode#privacy" data-analytics-cta="read_privacy_model" data-analytics-placement="privacy">Read the privacy model <span aria-hidden="true">→</span></a>
         </div>
-        <div class="privacy-console tilt" data-reveal>
+        <div class="privacy-console" data-reveal>
           <div class="console-bar"><span>Prompt safety check</span><span class="console-status">Ready to review</span></div>
           <ul>
-            <li><span class="status-icon">✓</span><div><strong>Secrets checked</strong><small>2 sensitive-looking lines removed</small></div></li>
-            <li><span class="status-icon">✓</span><div><strong>Blocked paths excluded</strong><small>.env, credentials, and key files</small></div></li>
-            <li><span class="status-icon">✓</span><div><strong>Scope limited</strong><small>Selection and 2 related symbols</small></div></li>
+            <li><span class="status-icon" aria-hidden="true">✓</span><div><strong>Secrets checked</strong><small>2 sensitive-looking lines removed</small></div></li>
+            <li><span class="status-icon" aria-hidden="true">✓</span><div><strong>Blocked paths excluded</strong><small>.env, credentials, and key files</small></div></li>
+            <li><span class="status-icon" aria-hidden="true">✓</span><div><strong>Scope limited</strong><small>Selection and 2 related symbols</small></div></li>
           </ul>
-          <div class="console-footer"><span>Nothing is sent until you choose.</span><strong>Review prompt →</strong></div>
+          <div class="console-footer"><span>Nothing is sent until you choose.</span><strong>Review prompt <span aria-hidden="true">→</span></strong></div>
         </div>
       </section>
 
@@ -294,13 +311,13 @@
           <h2 id="install-title">Keep control from the start</h2>
           <p>SimpleeCode is distributed as a VSIX. The optional ACP agent streams answers into the dashboard; without it, SimpleeCode uses its clipboard fallback.</p>
           <div class="actions">
-            <a class="button primary magnetic" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__">Download __SIMPLEECODE_VSIX__ <span aria-hidden="true">↓</span></a>
-            <a class="button quiet" href="https://github.com/promidon/simpleecode/blob/main/CHANGELOG.md">Read the changelog <span aria-hidden="true">→</span></a>
+            <a class="button primary" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__" data-analytics-cta="download_vsix" data-analytics-placement="install">Download __SIMPLEECODE_VSIX__ <span aria-hidden="true">↓</span></a>
+            <a class="button quiet" href="https://github.com/promidon/simpleecode/blob/main/CHANGELOG.md" data-analytics-cta="read_changelog" data-analytics-placement="install">Read the changelog <span aria-hidden="true">→</span></a>
           </div>
         </div>
 
         <ol class="install-steps">
-          <li data-reveal><span>01</span><div><strong>Download the VSIX</strong><p>Get the current signed release directly from this site.</p></div></li>
+          <li data-reveal><span>01</span><div><strong>Download the VSIX</strong><p>Get the current release directly from this site. Its SHA-256 checksum is published with each GitHub Release.</p></div></li>
           <li data-reveal><span>02</span><div><strong>Install it in VS Code</strong><p>Open Extensions, choose the ··· menu, then select “Install from VSIX…”</p></div></li>
           <li data-reveal><span>03</span><div><strong>Add streaming if you want it</strong><p>Run <code>npm i -g @zed-industries/claude-code-acp</code>. This step is optional.</p></div></li>
           <li data-reveal><span>04</span><div><strong>Open a project</strong><p>Choose the SimpleeCode icon, let the local index finish, then start a tour or select code to explain.</p></div></li>
@@ -317,7 +334,6 @@
           <ul>
             <li>Free to use</li>
             <li>Open source</li>
-            <li>No analytics or tracking</li>
           </ul>
         </div>
       </section>
@@ -327,7 +343,7 @@
         <p class="eyebrow">Start with a real project</p>
         <h2 id="closing-title">Ready to inspect<br><em>the code?</em></h2>
         <p>Download SimpleeCode and open a project you want to understand.</p>
-        <a class="button closing-button magnetic" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__">Download SimpleeCode <span aria-hidden="true">↓</span></a>
+        <a class="button closing-button" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__" data-analytics-cta="download_vsix" data-analytics-placement="closing">Download SimpleeCode <span aria-hidden="true">↓</span></a>
       </section>
     </main>
 
@@ -337,12 +353,14 @@
         <div><strong>SimpleeCode</strong><p>Understand the code before you trust it.</p></div>
       </div>
       <nav aria-label="Footer navigation">
-        <a href="https://github.com/promidon/simpleecode">Source</a>
+        <a href="https://github.com/promidon/simpleecode" data-analytics-cta="view_source" data-analytics-placement="footer">Source</a>
         <a href="https://github.com/promidon/simpleecode/issues">Issues</a>
         <a href="https://github.com/promidon/simpleecode/blob/main/SECURITY.md">Security</a>
         <a href="https://github.com/promidon/simpleecode/blob/main/LICENSE">GPL-3.0</a>
+        <button type="button" data-analytics-settings hidden>Analytics settings</button>
       </nav>
-      <p class="footer-note">Built in the open. No analytics. No tracking.</p>
+      <p class="footer-note">Built in the open.</p>
     </footer>
+
   </body>
 </html>

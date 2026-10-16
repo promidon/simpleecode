@@ -14,6 +14,7 @@ const required = [
   '404.html',
   'styles.css',
   'site.js',
+  'analytics.js',
   'latest.json',
   'SHA256SUMS.txt',
   '_redirects',
@@ -50,17 +51,29 @@ if (!index.includes('<html lang="en" data-theme="dark">') || !notFound.includes(
 }
 if (!index.includes(`href="/${vsixName}"`)) throw new Error('website has no direct VSIX download link');
 if (redirects !== `/download  /${vsixName}  302`) throw new Error('website has no stable download redirect');
-if (existsSync(resolve(publish, 'principles'))) throw new Error('website principles must not be published');
 if (!index.includes('data-tour-next')) throw new Error('website tour demo has no next-file control');
 if (!index.includes('data-explain-demo')) throw new Error('website explain demo has no trigger');
 if (!index.includes('data-selection-explanation')) throw new Error('website explain demo has no result panel');
+if (!index.includes('data-analytics-consent') || !index.includes('data-analytics-settings')) {
+  throw new Error('website has no analytics consent and settings controls');
+}
+if (!index.includes('data-analytics-allow') || !index.includes('data-analytics-deny')) {
+  throw new Error('website analytics consent must offer allow and decline actions');
+}
+if (index.includes('No analytics. No tracking.') || index.includes('No analytics or tracking')) {
+  throw new Error('website contains an outdated no-analytics claim');
+}
 
 for (const [name, html] of [['index.html', index], ['404.html', notFound]]) {
   const scriptTags = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
-  if (scriptTags.length !== 1 || !/\bsrc="\/site\.js"/.test(scriptTags[0][1])) {
-    throw new Error(`${name} must load only the same-origin site.js file`);
+  const scriptSources = scriptTags.map((match) => match[1].match(/\bsrc="([^"]+)"/)?.[1]).sort();
+  if (scriptTags.length !== 2 || scriptSources.join(',') !== '/analytics.js,/site.js') {
+    throw new Error(`${name} must load only the same-origin analytics.js and site.js files`);
   }
-  if (scriptTags[0][2].trim()) throw new Error(`${name} must not contain inline JavaScript`);
+  if (scriptTags.some((match) => match[2].trim())) throw new Error(`${name} must not contain inline JavaScript`);
+  if (html.includes('googletagmanager.com') || html.includes('google-analytics.com')) {
+    throw new Error(`${name} must not load Google directly from HTML`);
+  }
 }
 
 const csp = netlifyConfig.match(/Content-Security-Policy\s*=\s*"([^"]+)"/)?.[1];
@@ -72,8 +85,30 @@ const directives = new Map(csp.split(';').map((part) => {
 if (directives.get('default-src')?.join(' ') !== "'none'") {
   throw new Error("Content-Security-Policy default-src must be 'none'");
 }
-if (directives.get('script-src')?.join(' ') !== "'self'") {
-  throw new Error("Content-Security-Policy script-src must allow only 'self'");
+if (directives.get('script-src')?.join(' ') !== "'self' https://www.googletagmanager.com") {
+  throw new Error('Content-Security-Policy script-src has an unexpected allowlist');
+}
+if (directives.get('connect-src')?.join(' ') !== 'https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com') {
+  throw new Error('Content-Security-Policy connect-src has an unexpected allowlist');
+}
+if (directives.get('img-src')?.join(' ') !== "'self' https://*.google-analytics.com https://www.googletagmanager.com") {
+  throw new Error('Content-Security-Policy img-src has an unexpected allowlist');
+}
+for (const forbiddenSource of ["'unsafe-inline'", "'unsafe-eval'", 'doubleclick.net', 'googlesyndication.com']) {
+  if (csp.includes(forbiddenSource)) throw new Error(`Content-Security-Policy must not allow ${forbiddenSource}`);
+}
+
+if (process.argv.includes('--production')) {
+  // Versioned VSIX URLs are cached as immutable, so production must keep serving the released bytes.
+  const response = await fetch(`${site}/latest.json`, { cache: 'no-store', redirect: 'error' });
+  if (response.status !== 404) {
+    if (!response.ok) throw new Error(`could not read production latest.json (HTTP ${response.status})`);
+    const live = await response.json();
+    if (live.version === version && live.sha256 !== actualSha256) {
+      throw new Error(`production already serves ${vsixName} with SHA-256 ${live.sha256}; rebuild publish/ with release:prepare-site from the released VSIX`);
+    }
+  }
+  console.log(`✓ ${vsixName} matches production`);
 }
 
 console.log(`✓ Verified SimpleeCode ${version} release files`);
