@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
@@ -101,14 +101,30 @@ for (const forbiddenSource of ["'unsafe-inline'", "'unsafe-eval'", 'doubleclick.
 if (process.argv.includes('--production')) {
   // Versioned VSIX URLs are cached as immutable, so production must keep serving the released bytes.
   const response = await fetch(`${site}/latest.json`, { cache: 'no-store', redirect: 'error' });
+  let liveVersion = 'nothing';
+  const kept = readdirSync(publish).filter((name) => /^simpleecode-\d+\.\d+\.\d+\.vsix$/.test(name) && name !== vsixName);
   if (response.status !== 404) {
     if (!response.ok) throw new Error(`could not read production latest.json (HTTP ${response.status})`);
     const live = await response.json();
     if (live.version === version && live.sha256 !== actualSha256) {
       throw new Error(`production already serves ${vsixName} with SHA-256 ${live.sha256}; rebuild publish/ with release:prepare-site from the released VSIX`);
     }
+    if (live.version !== version && !kept.includes(`simpleecode-${live.version}.vsix`)) {
+      throw new Error(`publish/ would drop simpleecode-${live.version}.vsix, which production serves; rebuild with release.sh so earlier releases are kept`);
+    }
+    liveVersion = live.version;
   }
-  console.log(`✓ ${vsixName} matches production`);
+  // A kept VSIX that production already serves must be the very same bytes.
+  for (const name of kept) {
+    const served = await fetch(`${site}/${name}`, { cache: 'no-store', redirect: 'error' });
+    if (served.status === 404) continue;
+    if (!served.ok) throw new Error(`could not read production ${name} (HTTP ${served.status})`);
+    const servedSha256 = createHash('sha256').update(Buffer.from(await served.arrayBuffer())).digest('hex');
+    const keptSha256 = createHash('sha256').update(readFileSync(resolve(publish, name))).digest('hex');
+    if (servedSha256 !== keptSha256) throw new Error(`${name} differs from the copy production serves`);
+  }
+  console.log(liveVersion === version ? `✓ ${vsixName} matches production` : `✓ ${vsixName} is new (production serves ${liveVersion})`);
+  if (kept.length) console.log(`✓ Kept earlier releases unchanged: ${kept.join(', ')}`);
 }
 
 console.log(`✓ Verified SimpleeCode ${version} release files`);

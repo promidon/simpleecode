@@ -24,6 +24,12 @@ export class Logger implements vscode.Disposable {
     this.write('ERROR', message, details);
   }
 
+  show(): void {
+    if (!this.disposed) {
+      this.channel.show(true);
+    }
+  }
+
   dispose(): void {
     if (this.disposed) {
       return;

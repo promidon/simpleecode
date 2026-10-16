@@ -24,7 +24,7 @@ test('buildPrompt includes selected code, focus, and honesty rules', () => {
   assert.ok(prompt.includes('selection_only'));
 });
 
-test('buildPrompt includes dyslexia-friendly accessibility instructions', () => {
+test('buildPrompt includes universal readability without assigning a disability', () => {
   const packet: ContextPacket = {
     task: 'explain_selection',
     filePath: '/repo/src/math.ts',
@@ -37,7 +37,7 @@ test('buildPrompt includes dyslexia-friendly accessibility instructions', () => 
   };
   const prompt = buildPrompt(packet);
 
-  assert.ok(prompt.includes('dyslexic'));
+  assert.ok(!prompt.includes('dyslexic'));
   assert.ok(prompt.includes('plain, simple words'));
   assert.ok(prompt.includes('Short sentences'));
 });

@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { createHash } from 'crypto';
-import { buildEdges } from './graphEdges';
 import { parseModuleGraph } from './parseModuleGraph';
 import { summarizeModule } from './summarizeFile';
 import type { LocalStore } from '../storage/LocalStore';
@@ -97,14 +96,11 @@ export class FileIndex implements FileIndexService {
 
   constructor(
     private readonly logger: Logger,
-    private readonly store?: LocalStore,
+    private readonly store: LocalStore,
   ) {}
 
-  /** Load persisted records from the store (Build Order #6), if any. */
+  /** Load persisted records from the store (Build Order #6). */
   async load(): Promise<void> {
-    if (!this.store) {
-      return;
-    }
     try {
       await this.store.init();
       const rows = await this.store.all<FileRecord>(STORE_TABLE);
@@ -244,17 +240,13 @@ export class FileIndex implements FileIndexService {
   }
 
   /**
-   * Write the current records — and the graph edges derived from them (#19) —
-   * to the store (Build Order #6). Best-effort.
+   * Write the current records to the store (Build Order #6). Best-effort.
+   * Graph edges are rebuilt in memory by their readers, so they aren't stored.
    */
   private async persist(): Promise<void> {
-    if (!this.store) {
-      return;
-    }
     try {
       const records = [...this.records.values()];
       await this.store.replaceTable(STORE_TABLE, records);
-      await this.store.replaceTable('edges', buildEdges(records));
     } catch (err) {
       this.logger.warn('FileIndex: persist to store failed', String(err));
     }

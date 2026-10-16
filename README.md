@@ -12,8 +12,11 @@
 ![Built with AI](https://img.shields.io/badge/Built%20with-AI-blueviolet)
 ![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-007ACC)
 
-Select some code, click **Explain**, and SimpleeCode tells you what it does, how it
-connects to the rest of your project, and where to look to check for yourself.
+Select code and run **Explain Selection** to prepare the sidebar. Choose a goal,
+optionally add guidance such as “ELI5”, then press **Explain** to send.
+
+This checkout documents the **0.2.0 release candidate**. Published downloads may
+still be an earlier version until the release and update feed are published.
 
 ---
 
@@ -48,10 +51,11 @@ The whole idea only works if you can trust the answer. So SimpleeCode figures ou
 - **A structure + module graph** built from your actual imports, exports, and
   dependents
 
-The AI's only job is to turn those verified facts into a readable explanation.
-Then SimpleeCode **checks the answer back against your real code** and turns every
-file and line it mentions into a click-through link, so you can confirm it in one
-click. When the context was thin, it says so up front instead of guessing.
+AI turns the collected evidence into a readable explanation. SimpleeCode then
+runs a **limited grounding check** on recognized file, symbol, line, and fact
+claims, with links where locations can be resolved. Unrecognized prose remains
+unchecked; a grounded badge is not proof that an explanation is correct.
+Missing context is shown before sending.
 
 That's the deal: the deterministic layer finds the facts, the AI narrates them,
 and you get to verify.
@@ -60,40 +64,57 @@ and you get to verify.
 
 ## Quickstart
 
-Four steps to your first explanation.
+1. **Install the extension.** Download the VSIX and use VS Code's Extensions
+   menu → **Install from VSIX…**, or build this checkout with `npm ci && npm run package`.
+2. **Set up an ACP agent** for streamed answers:
+   `npm i -g @zed-industries/claude-code-acp`. Without an agent, an explicit
+   **Copy prompt and open chat** action is available. No clipboard fallback is silent.
+3. **Open your project and select code.** Right-click **SimpleeCode: Explain Selection**.
+4. **Choose a goal and press Explain.** Preparing code or changing a goal does not send it.
 
-1. **Install the extension.** [Download the latest VSIX](https://simpleecode.netlify.app/download),
-   then in VS Code open the Extensions view → `···` menu →
-   **Install from VSIX…** → pick the downloaded file.
-   (Or build it yourself with `npm install && npm run package`.)
-2. **Install the ACP agent** so answers stream back live:
-   `npm i -g @zed-industries/claude-code-acp`.
-   Without it, SimpleeCode still works but copies the prompt to your clipboard.
-3. **Open your project folder** and let the sidebar's **SimpleeCode** icon load
-   (it indexes locally — nothing is sent yet).
-4. **Select some code**, then click **Explain Selection** in the SimpleeCode
-   sidebar (or run `SimpleeCode: Explain Selection` from the Command Palette).
+### Goals and guidance
 
-Two settings worth knowing (both safe by default):
+| Goal | What changes |
+| --- | --- |
+| Understand this code | Purpose, main steps, inputs, and result for the captured code. |
+| See how it connects | Permitted related sources and file-level project relationships. |
+| Investigate a problem | Available diagnostics, relevant context, hypotheses, and checks you can try. Nothing is executed. |
 
-- `simpleecode.privacy.showPromptBeforeSending` — **on**, so the automatic review
-  shows the complete prompt, every included source, total size, privacy changes,
-  and possible clipboard use before every send.
-- `simpleecode.acp.transport` — **auto**, so SimpleeCode uses the ACP agent when it's
-  installed and falls back to clipboard when it isn't.
+“How would you like it explained?” is optional. Try “ELI5”, “Use an example”, or
+“I know JavaScript but I’m new to Swift”. Guidance changes communication, not
+privacy permissions. It stays with the explanation and follow-ups.
+
+**Save as my default** stores guidance on this device only. It does not change
+workspace settings or enroll it in Settings Sync. Update or remove it explicitly.
+Possible secrets must be reviewed in sanitized form before saving.
+
+**View what will be sent** and each answer's **What was sent** open an inspector
+inside the sidebar, not a blocking dialog. The inspector shows the frozen prompt,
+destination, sources, omissions, and prior turns retained in this explanation.
+
+Changing editors does not change captured code. Use **Use current selection**,
+**Use current file**, or **Refresh source** deliberately. Follow-ups reuse the
+captured evidence. Changing source, goal, or guidance starts a fresh conversation
+on the next send. Old answers retain their own source and prompt records.
+**Ask follow-up** sends from the answer area. **Review follow-up first** prepares
+an inline review instead. After cancellation or failure the agent conversation
+is reset; retries retain captured evidence but not the earlier agent responses.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `SimpleeCode: Open Dashboard` | Opens the dashboard webview |
-| `SimpleeCode: Explain Selection` | Captures file + selected text + line range → packet → answer |
-| `SimpleeCode: Explain Current File` | Captures the whole file → packet → answer |
-| `SimpleeCode: Explain System Role` | Grounds on the file and as much verified module graph as the configured maximum privacy scope permits |
-| `SimpleeCode: Start Codebase Tour` | Walks the codebase file by file, in dependency order |
-| `SimpleeCode: New Conversation` | Drops the session so the next question starts fresh |
-| `SimpleeCode: Stop the Current Answer` | Cancels a prompt that's still streaming |
-| `SimpleeCode: Reindex Workspace` | Rescans the workspace and rebuilds the local file + symbol index |
+| Open Dashboard | Opens the optional editor-tab surface; the sidebar is the default explanation entry. |
+| Explain Selection / Enclosing Function / Current File | Captures that code and prepares Understand. Does not send or change the editor selection. |
+| Explain System Role | Prepares Connections, capped by privacy settings. |
+| Start Codebase Tour | Walks indexed files; Explain this step prepares Connections and keeps the Tour position. |
+| New Conversation | Clears answer history and starts a new explanation with the saved guidance default. |
+| Stop the Current Answer | Stops preparation or generation; partial output remains marked incomplete. |
+| Reindex Workspace | Rebuilds the local file and symbol index. |
+
+The old Beginner, Detailed, and Debug command identifiers remain compatible
+aliases. They prepare Understand with temporary guidance, or Investigate,
+instead of sending immediately. They are no longer displayed as depth modes.
 
 ## Privacy
 
@@ -102,8 +123,17 @@ SimpleeCode runs locally and is careful about what leaves your machine.
 - It never sends `.env`, key/credential files, or anything matching
   `simpleecode.privacy.blockedFileGlobs`.
 - Secret-looking lines are redacted and oversized files are truncated.
-- By default, an automatic **review shows the complete prompt** before anything
-  leaves your machine. The dashboard can reopen the last reviewed prompt.
+- Preparation is local. Sending or copying requires an explicit action.
+- The complete prompt is always inspectable. Extra review is **off by default**;
+  an explicitly enabled `simpleecode.privacy.showPromptBeforeSending` requires
+  inline approval before sending, never a blocking modal.
+- `simpleecode.privacy.defaultScope` remains the maximum allowed context. Goals
+  request appropriate evidence within that limit; guidance cannot raise it.
+- Prompts, code and answers stay in memory in the extension by default. Agent
+  software or external chat may have its own storage policy. Only explicitly
+  saved guidance is persisted by the explanation feature.
+- External handoff cannot confirm delivery, answers, or the external chat's
+  previous context. Paste into a new chat for a fresh explanation.
 - The ACP client grants no file-system capabilities, rejects tool permissions,
   launches the agent in an isolated working directory, and passes a minimal
   environment. The locally installed ACP agent remains a trusted process, not an
@@ -159,7 +189,7 @@ holding the whole codebase in your head. Pick one. Or fix a typo; that counts to
    AST, the module graph. The AI only turns those facts into readable prose. If
    a feature needs the model to *invent* a fact, it needs a rethink.
 2. **Privacy is not optional.** Nothing new leaves the machine without going
-   through the privacy guard and the prompt review.
+   through privacy guards, inspectable context, and an explicit send or copy action.
 
 New to open source? That's fine — say so in your PR and I'll walk through it
 with you. Small PRs get reviewed faster than big ones.

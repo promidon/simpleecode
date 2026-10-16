@@ -40,7 +40,10 @@ export interface AcpTransportAdapter {
 }
 
 /** Application-facing ACP boundary owned by the router. */
-export interface AcpChatAdapter extends AcpTransportAdapter {
+export interface AcpChatAdapter {
+  describeAvailability(): Promise<AcpAvailability>;
+  resolveDelivery(): Promise<'agent' | 'command' | 'clipboard'>;
+  sendPreparedPrompt(prompt: string, delivery: 'agent' | 'command' | 'clipboard', onChunk?: (text: string) => void): Promise<AcpSendResult>;
   /**
    * Stop the prompt currently in flight, if any. Safe to call when nothing is
    * running (a no-op). The session is kept alive so follow-ups still work.

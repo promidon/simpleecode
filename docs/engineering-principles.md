@@ -12,9 +12,9 @@ _(aspirational)_ are what we would add if this moved to a production/commercial
 footing.
 
 SimpleeCode is local-first. It builds deterministic context from the open
-workspace, applies privacy guards, sends only the reviewed packet to the ACP
+workspace, applies privacy guards, sends only the explicitly submitted, inspectable packet to the ACP
 transport, renders the answer in a VS Code webview, and verifies claims back
-against the local index where possible.
+against the evidence actually sent for that answer where possible.
 
 ---
 
@@ -91,6 +91,17 @@ sidebar.
 
 ---
 
+## Explanation ownership
+
+The host owns a captured source, preparation revision, goal, guidance, evidence,
+resolved delivery, and immutable outbound envelope. UI messages are intentions.
+Do not reread the active editor during an asynchronous request. Facts and answer
+checks belong to the request that produced them. Retired operations cannot update
+new sessions. Changing source, goal, guidance, or privacy scope requires a fresh
+conversation; follow-ups retain the captured evidence and inspectable history.
+Optional guidance never grants source/tool permissions. Apply privacy guards to
+metadata, diagnostics, documents, and guidance as well as raw code.
+
 ## Foundational architecture principles
 
 - **KISS** - the fewest moving parts that work. No background services or extra
@@ -117,9 +128,9 @@ extension's actual risk surface.
 
 | Principle | How it shows up here |
 | --- | --- |
-| **Confidentiality** | Code stays local unless the user sends a reviewed packet. Blocked file globs, secret redaction, size limits, prompt preview, webview CSP, and least-data scopes limit what can leave the machine. |
+| **Confidentiality** | Code stays local unless the user explicitly sends a guarded packet. Blocked file globs, secret redaction, size limits, prompt preview, webview CSP, and least-data scopes limit what can leave the machine. |
 | **Integrity** | Facts come from the workspace, parser, language server, and local index. Prompt building and answer verification are deterministic and tested; generated prose is treated as inspectable, not authoritative. |
-| **Availability** | The extension works locally, indexes idempotently, and degrades from ACP agent to command/clipboard transport where possible. Network features such as updates and feedback are optional and bounded. |
+| **Availability** | The extension works locally, indexes idempotently, and offers an explicit command/clipboard handoff when an agent is unavailable. Network features such as updates and feedback are optional and bounded. |
 
 ### Secure development lifecycle (Annex A.8.25)
 
@@ -164,7 +175,7 @@ extension's actual risk surface.
   such as owner, contributor, tester, and service, then enforce them in both
   policy and operation layers.
 - **Defense in depth** - multiple layers must agree: blocked path -> redaction
-  -> truncation -> preview -> transport boundary -> claim verification.
+  -> truncation -> inspectable envelope -> explicit send -> transport boundary -> claim verification.
 - **Minimize attack surface** - expose the fewest commands, webview messages,
   endpoints, and settings necessary. Guard privileged or hosted endpoints with a
   secret and tight validation.

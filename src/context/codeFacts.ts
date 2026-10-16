@@ -3,7 +3,7 @@ import { parseHover } from './hoverParse';
 import { explainSignature } from './explainSignature';
 import { keywordDefinition } from './keywordGlossary';
 import { parseDeclaration } from './parseDeclaration';
-import { getParentSymbol } from './parentSymbol';
+import type { SourceSnapshot } from '../explanation/model';
 import { structureFacts, type StructureFacts } from './structureFacts';
 
 /**
@@ -33,73 +33,29 @@ export interface CodeFacts {
   structure?: StructureFacts;
 }
 
-export async function getCodeFacts(): Promise<CodeFacts | undefined> {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) {
-    return undefined;
-  }
-
-  // Floor: parse the selected text ourselves — works with no language server.
-  const selected = editor.document.getText(editor.selection);
-  const declared = parseDeclaration(selected, editor.document.languageId);
-
-  // Enrich: ask the language server, when it actually serves this file.
-  const probe = await probePosition(editor);
-  const lsp = probe
-    ? await readLspFacts(editor.document.uri, probe.position)
-    : undefined;
-
-  const symbol = declared?.name ?? probe?.symbol;
-  if (!symbol) {
-    return undefined;
+export async function getCodeFacts(source: SourceSnapshot, allowLsp = true, allowExternalFacts = true): Promise<CodeFacts | undefined> {
+  const selected = source.focus === 'selection' ? source.selectedText : source.fullText;
+  const declared = parseDeclaration(selected, source.languageId);
+  const identifier = declared?.name ?? selected.match(/\b[A-Za-z_]\w*/g)?.find(word => !/^(return|function|const|let|var|if|else|class|import|export|default|async|await|new|throw|try|true|false|null|undefined)$/.test(word));
+  if (!identifier) { return undefined; }
+  const selectionOffset = source.focus === 'file' ? 0 : source.fullText.split('\n').slice(0, source.startLine - 1).reduce((n, line) => n + line.length + 1, 0) + source.startCharacter;
+  const offset = source.fullText.indexOf(identifier, selectionOffset);
+  const prefix = source.fullText.slice(0, Math.max(0, offset)).split('\n');
+  const document = vscode.workspace.textDocuments.find(d => d.uri.toString() === source.uri);
+  let lsp: LspFacts | undefined;
+  if (allowLsp && document?.version === source.version && offset >= 0) {
+    lsp = await readLspFacts(document.uri, new vscode.Position(prefix.length - 1, prefix.at(-1)!.length));
+    if (document.version !== source.version) { lsp = undefined; }
+    if (!allowExternalFacts && lsp?.definition?.replace(/:\d+$/, '') !== vscode.workspace.asRelativePath(document.uri, false)) { lsp = undefined; }
   }
   const signature = lsp?.signature ?? declared?.signature;
-  const plain = signature ? explainSignature(signature) : undefined;
   return {
-    symbol,
-    kind: declared?.kind,
-    kindMeaning: declared?.kind
-      ? keywordDefinition(declared.kind, editor.document.languageId)
-      : undefined,
-    signature,
-    plain,
-    doc: lsp?.doc,
-    definition: lsp?.definition,
-    callerCount: lsp?.callerCount,
-    // Structure facts come from the selected text itself — always available,
-    // even when no language server serves the file.
-    structure: structureFacts(selected, editor.document.languageId),
+    symbol: identifier, kind: declared?.kind,
+    kindMeaning: declared?.kind ? keywordDefinition(declared.kind, source.languageId) : undefined,
+    signature, plain: signature ? explainSignature(signature) : undefined,
+    doc: lsp?.doc, definition: lsp?.definition, callerCount: lsp?.callerCount,
+    structure: structureFacts(selected, source.languageId),
   };
-}
-
-/**
- * Explain the symbol under the cursor using the language server (the "engine") —
- * for things not declared in this file (frameworks, SDK types like `SwiftUI`,
- * `View`, `URL`). Deterministic: same code + position → same hover. Returns
- * undefined when the server has nothing (e.g. an unindexed Xcode target).
- */
-export async function explainSymbolViaLsp(): Promise<string | undefined> {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) {
-    return undefined;
-  }
-  const probe = await probePosition(editor);
-  if (!probe) {
-    return undefined;
-  }
-  const hover = await readHover(editor.document.uri, probe.position);
-  const { signature, doc } = parseHover(hover);
-  if (!signature && !doc) {
-    return undefined;
-  }
-  const lines = [probe.symbol];
-  if (signature) {
-    lines.push('', explainSignature(signature) ?? signature);
-  }
-  if (doc) {
-    lines.push('', doc);
-  }
-  return lines.join('\n');
 }
 
 interface LspFacts {
@@ -120,73 +76,6 @@ async function readLspFacts(
   ]);
   const { signature, doc } = parseHover(hover);
   return { signature, doc, definition, callerCount };
-}
-
-/**
- * Where to read facts from: the word under the cursor if there is one, otherwise
- * the enclosing symbol's name (so a selection that starts on an attribute line
- * like `@MainActor` still resolves to the type/function it belongs to).
- */
-async function probePosition(
-  editor: vscode.TextEditor,
-): Promise<{ position: vscode.Position; symbol: string } | undefined> {
-  // 1. The word under the cursor — but skip language keywords like `enum`/`func`.
-  for (const candidate of [editor.selection.active, editor.selection.start]) {
-    const range = editor.document.getWordRangeAtPosition(candidate);
-    if (range) {
-      const word = editor.document.getText(range);
-      if (!DECLARATION_KEYWORDS.has(word)) {
-        return { position: range.start, symbol: word };
-      }
-    }
-  }
-  // 2. First non-keyword identifier in the selection (e.g. the name after `enum`).
-  const scanned = firstIdentifierInSelection(editor);
-  if (scanned) {
-    return scanned;
-  }
-  // 3. The enclosing symbol's name.
-  const parent = await getParentSymbol();
-  if (parent) {
-    return {
-      position: new vscode.Position(
-        parent.namePosition.line,
-        parent.namePosition.character,
-      ),
-      symbol: parent.name,
-    };
-  }
-  return undefined;
-}
-
-const DECLARATION_KEYWORDS = new Set([
-  'enum', 'struct', 'class', 'func', 'var', 'let', 'protocol', 'actor',
-  'extension', 'typealias', 'case', 'import', 'static', 'final', 'public',
-  'private', 'internal', 'open', 'fileprivate', 'override', 'init', 'return',
-]);
-
-function firstIdentifierInSelection(
-  editor: vscode.TextEditor,
-): { position: vscode.Position; symbol: string } | undefined {
-  const sel = editor.selection;
-  for (let line = sel.start.line; line <= sel.end.line; line++) {
-    const text = editor.document.lineAt(line).text;
-    const re = /[A-Za-z_]\w*/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
-      const ch = m.index;
-      if (line === sel.start.line && ch < sel.start.character) {
-        continue;
-      }
-      if (line === sel.end.line && ch >= sel.end.character) {
-        break;
-      }
-      if (!DECLARATION_KEYWORDS.has(m[0])) {
-        return { position: new vscode.Position(line, ch), symbol: m[0] };
-      }
-    }
-  }
-  return undefined;
 }
 
 async function readHover(uri: vscode.Uri, position: vscode.Position): Promise<string> {

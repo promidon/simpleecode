@@ -24,15 +24,14 @@ interface AcpCommandConfig {
  * Delivery reality: `acp.sendPrompt` in the reference extension is a Command
  * Palette action that sends the chat input box — passing a prompt argument is
  * not guaranteed to populate it. So `auto` mode always copies the prompt to the
- * clipboard and opens the chat as a dependable fallback, then *attempts* the
- * command. `command` mode trusts arg-passing; `clipboard` mode skips it.
+ * clipboard and opens the chat only after an explicit handoff action.
+ * `command` mode requests argument-based delivery without claiming confirmation.
  */
 export class VscodeAcpAdapter implements AcpTransportAdapter {
   constructor(private readonly logger: Logger) {}
 
-  private async openChat(): Promise<void> {
-    const cfg = this.readConfig();
-    if (await this.hasCommand(cfg.openChat)) {
+  private async openChat(cfg: AcpCommandConfig, current: () => boolean): Promise<void> {
+    if (await this.hasCommand(cfg.openChat) && current()) {
       try {
         await vscode.commands.executeCommand(cfg.openChat);
       } catch (err) {
@@ -45,9 +44,12 @@ export class VscodeAcpAdapter implements AcpTransportAdapter {
     }
   }
 
-  async sendPrompt(prompt: string): Promise<AcpSendResult> {
+  async sendPrompt(prompt: string, _onChunk?: (text: string) => void, current: () => boolean = () => true): Promise<AcpSendResult> {
     const cfg = this.readConfig();
     const sendPresent = await this.hasCommand(cfg.sendPrompt);
+    if (!current() || JSON.stringify(cfg) !== JSON.stringify(this.readConfig())) {
+      return { delivery: 'failed', detail: 'Handoff cancelled or settings changed before dispatch. Nothing was copied or sent.' };
+    }
 
     if (cfg.sendStrategy === 'command') {
       if (!sendPresent) {
@@ -58,7 +60,7 @@ export class VscodeAcpAdapter implements AcpTransportAdapter {
       }
       try {
         await vscode.commands.executeCommand(cfg.sendPrompt, prompt);
-        return { delivery: 'command', detail: `Sent via ${cfg.sendPrompt}.` };
+        return { delivery: 'command', detail: `Handoff requested via ${cfg.sendPrompt}. Delivery and answers cannot be confirmed automatically.` };
       } catch (err) {
         this.logger.error(`ACP send failed`, redactSecrets(String(err)).text);
         return {
@@ -68,45 +70,12 @@ export class VscodeAcpAdapter implements AcpTransportAdapter {
       }
     }
 
-    if (cfg.sendStrategy === 'clipboard' || !sendPresent) {
-      await vscode.env.clipboard.writeText(prompt);
-      await this.openChat();
-      return {
-        delivery: 'clipboard',
-        detail: sendPresent
-          ? 'Prompt copied to clipboard and ACP chat opened (clipboard strategy).'
-          : 'ACP send command not found — prompt copied to clipboard and chat opened for paste.',
-      };
-    }
-
-    // strategy === 'auto' with the send command present: clipboard as a safety
-    // net, open chat, then attempt the command in case it accepts the argument.
     await vscode.env.clipboard.writeText(prompt);
-    await this.openChat();
-    try {
-      await vscode.commands.executeCommand(cfg.sendPrompt, prompt);
-    } catch (err) {
-      this.logger.warn(
-        `ACP send command threw (clipboard backup is set)`,
-        redactSecrets(String(err)).text,
-      );
-    }
+    await this.openChat(cfg, current);
     return {
-      delivery: 'command',
-      detail:
-        'Attempted ACP send; prompt also copied to clipboard — paste it if the chat box is empty.',
+      delivery: 'clipboard',
+      detail: 'Copied for manual paste into a new external chat. External conversation history and answers are not controlled by SimpleeCode.',
     };
-  }
-
-  newConversation(): void {
-    // Best-effort: ask the vscode-acp extension to start a fresh chat, if it
-    // exposes that command. Fire-and-forget so this stays synchronous.
-    const cfg = this.readConfig();
-    void this.hasCommand(cfg.newConversation).then((present) => {
-      if (present) {
-        void vscode.commands.executeCommand(cfg.newConversation);
-      }
-    });
   }
 
   async describeAvailability(): Promise<AcpAvailability> {
@@ -120,7 +89,7 @@ export class VscodeAcpAdapter implements AcpTransportAdapter {
     if (available) {
       detail = `ACP transport detected (${extensionInstalled ? cfg.extensionId : cfg.sendPrompt}).`;
     } else {
-      detail = `No ACP transport found. Install "${cfg.extensionId}" (vscode-acp). SimpleeCode will copy prompts to the clipboard until then.`;
+      detail = `No ACP transport found. Install "${cfg.extensionId}" (vscode-acp), or explicitly copy a prepared prompt for use elsewhere.`;
     }
 
     return {

@@ -1,4 +1,4 @@
-/* SimpleeCode dashboard — redesign (docs/design/redesign-plan.md).
+/* SimpleeCode dashboard — shared goal-driven explanation workspace.
    Colour = brand palette (light default; dark/high-contrast keyed off the
    vscode-* body classes VS Code sets on the webview). Geometry & chrome
    (radius, focus, inputs) inherit VS Code via --vscode-* with fallbacks. */
@@ -95,6 +95,12 @@ body.vscode-dark {
 /* High-contrast — lean on VS Code's own high-contrast foreground/borders so
    the calm palette never drops below the HC floor. Refined in Phase 6. */
 body.vscode-high-contrast {
+  --bg: var(--vscode-editor-background, #000000);
+  --surface: var(--vscode-editor-background, #000000);
+  --elev: var(--vscode-editor-background, #000000);
+  --code-bg: var(--vscode-editor-background, #000000);
+  --text: var(--vscode-foreground, #ffffff);
+  --surface-2: var(--vscode-editor-background, #000000);
   --border: var(--vscode-contrastBorder, rgba(255, 255, 255, 0.6));
   --border-2: var(--vscode-contrastBorder, rgba(255, 255, 255, 0.8));
   --text-2: var(--vscode-foreground, #fff);
@@ -118,6 +124,8 @@ body.vscode-high-contrast-light {
   box-sizing: border-box;
 }
 
+[hidden] { display: none !important; }
+
 html,
 body {
   height: 100%;
@@ -125,7 +133,7 @@ body {
 }
 
 body {
-  font-family: 'Atkinson Hyperlegible', var(--vscode-font-family), system-ui, sans-serif;
+  font-family: 'Atkinson Hyperlegible', var(--vscode-font-family, system-ui), sans-serif;
   font-size: var(--vscode-font-size, 13px);
   line-height: 1.55;
   color: var(--text);
@@ -1148,10 +1156,6 @@ ul.claims li {
 }
 
 /* --- Review-before-sending modal --------------------------------------- */
-.modal-root[hidden] {
-  display: none;
-}
-
 .modal-root {
   position: fixed;
   inset: 0;
@@ -1360,6 +1364,47 @@ ul.claims li {
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+/* VS Code's own "reduce motion" setting, independent of the OS preference. */
+body.vscode-reduce-motion * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+/* Prepared explanation and inspector share one scrolling surface. No fixed
+   action/footer can conceal controls in a short or zoomed sidebar. */
+.explain-workspace, .explanation-inspector {
+  flex: 1; min-height: 0; min-width: 0; overflow: auto;
+  padding: 16px; overflow-wrap: anywhere; scrollbar-gutter: stable;
+}
+.explanation-controls { display: grid; gap: 8px; margin: 20px 0; }
+.explanation-controls label, #followup-form label { font-weight: 700; }
+.explanation-controls select, .explanation-controls textarea, #followup-question {
+  box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%;
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 8px;
+}
+.explanation-controls textarea, #followup-question { resize: vertical; }
+.explanation-controls p { margin: 0 0 8px; }
+.source-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.source-actions button { min-height: 32px; white-space: normal; }
+#explanation-inspector pre, #safe-guidance, #captured-code {
+  max-height: none; overflow: visible;
+  white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-width: 100%;
+}
+#inspector-summary, #preparation-gaps { white-space: pre-line; }
+#local-explanation { white-space: pre-wrap; margin: 20px 0; }
+#explain-content article { padding: 20px 0; border-top: 1px solid var(--border-2); }
+#explain-content article h2 { font-size: 1.05em; }
+#guidance-error { color: var(--warn); }
+#followup-form { display: grid; gap: 8px; padding: 20px 0; }
+.explain-workspace #facts-rail { max-height: none; overflow: visible; }
+@media (max-width: 560px) {
+  .topbar { flex-wrap: wrap; }
+  .brand { flex-wrap: wrap; }
+  .tabs { order: 3; width: 100%; }
+  .explain-workspace, .explanation-inspector { padding: 12px; }
 }

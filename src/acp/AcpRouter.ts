@@ -12,26 +12,38 @@ import type { Logger } from '../utils/logger';
 type AcpTransport = 'auto' | 'agent' | 'commands';
 
 /**
- * Picks the ACP transport per send, driven by `simpleecode.acp.transport`:
+ * Resolves delivery during preparation and revalidates before dispatch:
  *
  * - `agent`    — always the spawned ACP agent process (real delivery + answer).
- * - `commands` — always the `vscode-acp` extension commands (clipboard safety net).
+ * - `commands` — explicit external handoff; no silent clipboard fallback.
  * - `auto`     — the agent when its command is on PATH, else the commands path.
  */
 export class AcpRouter implements AcpChatAdapter {
   private readonly agent: AcpProcessAdapter;
   private readonly commands: VscodeAcpAdapter;
+  private generation = 0;
 
   constructor(logger: Logger, isolatedCwd: string) {
     this.agent = new AcpProcessAdapter(logger, isolatedCwd);
     this.commands = new VscodeAcpAdapter(logger);
   }
 
-  async sendPrompt(
+  async sendPreparedPrompt(
     prompt: string,
+    delivery: 'agent' | 'command' | 'clipboard',
     onChunk?: (textSoFar: string) => void,
   ): Promise<AcpSendResult> {
-    return (await this.pick()).sendPrompt(prompt, onChunk);
+    const generation = this.generation;
+    if (delivery !== await this.resolveDelivery() || generation !== this.generation) {
+      return { delivery: 'failed', detail: 'Delivery changed. Refresh the prepared explanation before sending.' };
+    }
+    return delivery === 'agent' ? this.agent.sendPrompt(prompt, onChunk) : this.commands.sendPrompt(prompt, undefined, () => generation === this.generation);
+  }
+
+  async resolveDelivery(): Promise<'agent' | 'command' | 'clipboard'> {
+    const selected = await this.pick();
+    if (selected === this.agent) { return 'agent'; }
+    return vscode.workspace.getConfiguration('simpleecode.acp').get('sendStrategy') === 'command' ? 'command' : 'clipboard';
   }
 
   /**
@@ -39,6 +51,7 @@ export class AcpRouter implements AcpChatAdapter {
    * cancel targets it directly (the commands path has nothing to stop).
    */
   cancel(): void {
+    this.generation++;
     this.agent.cancel();
   }
 
@@ -47,8 +60,8 @@ export class AcpRouter implements AcpChatAdapter {
    * resetting it there is the meaningful action for either transport.
    */
   newConversation(): void {
+    this.generation++;
     this.agent.newConversation();
-    this.commands.newConversation();
   }
 
   async describeAvailability(): Promise<AcpAvailability> {
@@ -57,6 +70,7 @@ export class AcpRouter implements AcpChatAdapter {
 
   /** Kill the agent process on deactivation. */
   dispose(): void {
+    this.generation++;
     this.agent.stop();
   }
 

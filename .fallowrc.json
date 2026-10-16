@@ -5,6 +5,8 @@
   // only by a test is wrongly flagged as an unused export/type.
   // Docs: https://docs.fallow.tools/configuration/overview
   "entry": [
+    "tests/**",
+    "src/integration/**",
     "src/test/**/*.test.ts",     // run by `node --test out/test/**` (package.json "test")
     "netlify/functions/**/*.js", // HTTP serverless entry points (netlify.toml)
     "scripts/**/*.mjs",          // release helpers invoked by scripts/release.sh
@@ -46,7 +48,7 @@
     },
     {
       "implements": "vscode.Disposable",
-      "members": ["dispose"]
+      "members": ["dispose", "show"]
     }
   ]
 }

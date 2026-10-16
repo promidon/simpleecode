@@ -44,10 +44,10 @@ export function buildOutboundEnvelope(
       Boolean(packet.meta?.truncated) ||
       includedRetrieved.some((item) => item.truncated),
     redactions,
-    includedSources: [
+    includedSources: [...new Set([
       packet.filePath ?? '(untitled buffer)',
       ...includedRetrieved.map((item) => item.path),
-    ],
+    ])],
     channel,
   };
 }

@@ -7,6 +7,7 @@ VERSION="$(node -p "require('./package.json').version")"
 TAG="v${VERSION}"
 VSIX="simpleecode-${VERSION}.vsix"
 DEFAULT_NOTES="docs/releases/${VERSION}.md"
+REPO="promidon/simpleecode"
 
 usage() {
   echo "Usage:"
@@ -25,6 +26,30 @@ require_stable_version() {
   fi
 }
 
+# Earlier releases stay downloadable from the site: their versioned VSIX URLs are
+# cached as immutable, so every build carries the exact published bytes forward.
+fetch_previous_releases() {
+  local previous_dir tags tag dir
+  previous_dir="$(mktemp -d)"
+  # Assign first so a gh failure stops the script instead of silently dropping releases.
+  tags="$(gh release list --repo "${REPO}" --limit 100 --json tagName,isDraft,isPrerelease \
+    --jq '.[] | select((.isDraft or .isPrerelease) | not) | .tagName')"
+  for tag in ${tags}; do
+    [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+    [ "${tag}" = "${TAG}" ] && continue
+    dir="${previous_dir}/${tag}"
+    mkdir -p "${dir}"
+    gh release download "${tag}" --repo "${REPO}" --pattern 'simpleecode-*.vsix' --pattern 'SHA256SUMS.txt' --dir "${dir}"
+    if ! (cd "${dir}" && shasum -a 256 -c SHA256SUMS.txt >/dev/null); then
+      echo "✗ ${tag} release assets do not match their SHA256SUMS.txt."
+      exit 1
+    fi
+    mv "${dir}"/simpleecode-*.vsix "${previous_dir}/"
+    echo "→ Keeping released ${tag}"
+  done
+  export SIMPLEECODE_PREVIOUS_VSIX_DIR="${previous_dir}"
+}
+
 prepare() {
   local notes_file="${1:-${DEFAULT_NOTES}}"
   require_stable_version
@@ -35,6 +60,7 @@ prepare() {
 
   echo "→ Packaging ${VSIX}"
   npx --no-install vsce package --out "${VSIX}"
+  fetch_previous_releases
   node scripts/build-release.mjs "${notes_file}"
   node scripts/verify-release.mjs
 }
@@ -70,6 +96,7 @@ prepare_site() {
   fi
 
   echo "→ Reusing released ${VSIX}"
+  fetch_previous_releases
   node scripts/build-release.mjs "${notes_file}" "${vsix_file}" "${expected_sha256}"
   node scripts/verify-release.mjs
 }
@@ -135,7 +162,7 @@ github_release() {
   gh release create "${TAG}" \
     "${VSIX}#SimpleeCode ${VERSION} VSIX" \
     "publish/SHA256SUMS.txt#SHA-256 checksums" \
-    --repo promidon/simpleecode \
+    --repo "${REPO}" \
     --title "SimpleeCode ${VERSION}" \
     --notes-file "${notes_file}" \
     --verify-tag
