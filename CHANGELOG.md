@@ -7,6 +7,18 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-10-16
+
+### Changed
+
+- Explain works like a chat window: it fills the full height of the sidebar and
+  resizes with VS Code, with the follow-up box at the bottom.
+- Pressing Explain folds both setup and Context & facts into one-line bars pinned
+  at the top, so the answer gets the full height. Edit and Show reopen them.
+- Each new answer, including follow-ups, starts just under the bars so you read
+  from the first line; "↓ Latest" appears when more text is below.
+- Stop lives in the follow-up box while an answer prints.
+
 ## [0.2.1] — 2026-10-16
 
 ### Changed

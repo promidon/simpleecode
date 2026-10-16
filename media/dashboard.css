@@ -126,10 +126,14 @@ body.vscode-high-contrast-light {
 
 [hidden] { display: none !important; }
 
+/* The pane is exactly the sidebar: VS Code's default body padding is removed and
+   the page itself never scrolls; only the conversation (and Tour/Check) scroll. */
 html,
 body {
   height: 100%;
   margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 body {
@@ -1277,7 +1281,35 @@ body.vscode-reduce-motion * {
   flex: 1; min-height: 0; min-width: 0; overflow: auto;
   padding: 12px; overflow-wrap: anywhere; scrollbar-gutter: stable;
 }
-.explain-workspace { display: grid; gap: 12px; align-content: start; }
+.explain-workspace { position: relative; display: grid; gap: 12px; align-content: start; }
+
+/* Setup and facts: while an answer is on screen they are one-line bars pinned to
+   the top. Opening either one unpins the region so nothing hides under it. */
+.pinned { display: grid; gap: 8px; }
+.pinned.is-pinned:not(:has(.facts-fold[open])) {
+  /* top: -12px cancels the workspace padding so no text shows above the bars. */
+  position: sticky; top: -12px; z-index: 3;
+  margin: -12px -12px 0; padding: 12px 12px 8px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+}
+/* Folded facts read as a bar like the setup summary: "Context and facts · AppConfig  Show". */
+.pinned .facts-fold:not([open]) > summary {
+  align-items: center; padding: 6px 10px; font-size: 0.88em; color: var(--text-2);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2);
+}
+.pinned .facts-fold:not([open]) > summary .rail-title {
+  text-transform: none; letter-spacing: 0; font-size: 1em; font-weight: 400; color: var(--text-2);
+}
+.pinned .facts-fold:not([open]) .facts-summary-symbol { margin-left: 0; font-size: 1em; color: var(--text-2); flex: 1; min-width: 0; }
+.pinned .facts-fold:not([open]) .facts-summary-symbol::before { content: '· '; }
+.pinned .facts-fold:not([open]) > summary::after { content: 'Show' / ''; color: var(--accent); flex: none; }
+
+.jump-latest {
+  position: sticky; bottom: 8px; z-index: 3; justify-self: end;
+  min-height: 26px; padding: 2px 12px; border-radius: 999px;
+  border: 1px solid var(--border-2); background: var(--elev); color: var(--accent);
+  box-shadow: var(--shadow-card); font-size: 0.85em;
+}
 .explanation-inspector { display: grid; gap: 10px; align-content: start; }
 #inspector-title { margin: 0; font-size: 1.05em; font-weight: 600; }
 
@@ -1375,19 +1407,32 @@ body.vscode-reduce-motion * {
 
 /* Answers */
 #explain-content { display: grid; gap: 16px; }
-#explain-content article { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+#explain-content article { display: grid; gap: 6px; align-content: start; padding-top: 12px; border-top: 1px solid var(--border); }
 #explain-content article:first-child { border-top: 0; padding-top: 0; }
 .turn-title { margin: 0; font-size: 0.92em; font-weight: 600; color: var(--text-2); }
 .turn-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 0.85em; color: var(--text-2); }
 .turn-status { margin: 0; }
-.turn-stop { justify-self: start; }
 .check-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
 .chip { padding: 1px 8px; border-radius: 999px; font-size: 0.85em; border: 1px solid var(--border-2); color: var(--text-2); }
 .chip-ok { color: var(--ok); border-color: currentColor; }
 .chip-warn { color: var(--warn); border-color: currentColor; }
 
-/* Follow-up */
-.followup { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+/* Chat composer: a flex row under the conversation (never position: fixed). Capped so a
+   short or zoomed sidebar still shows the conversation; it scrolls itself if needed. */
+.followup {
+  flex: none; display: grid; gap: 6px; max-height: 45%; overflow: auto;
+  padding: 10px 12px; border-top: 1px solid var(--border); background: var(--surface);
+}
+.explanation-inspector:not([hidden]) ~ .followup { display: none; }
+#followup-question:disabled { color: var(--text-2); background: var(--surface-2); }
+/* Short or zoomed sidebar: a one-line composer so the conversation keeps the room.
+   The help text stays available to screen readers through aria-describedby. */
+@media (max-height: 520px) {
+  .followup { gap: 4px; padding: 6px 12px; }
+  .followup > label { font-size: 0.85em; margin: 0; }
+  #followup-question { min-height: 0; height: 2.4em; resize: none; }
+  #followup-help { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
 .followup-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 .icon-only { width: 34px; min-height: 34px; padding: 0; justify-content: center; }
 

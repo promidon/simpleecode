@@ -42,7 +42,7 @@ async function mount(page, review = false, hasSource = true, streaming = false, 
     async prepare(draft, _signal, previous) {
       const packet = buildContextPacket(draft, DEFAULT_PRIVACY_CONFIG);
       const prompt = buildPrompt(packet, [], 'standard', undefined, undefined, undefined, draft.options);
-      return { draft, packet, envelope: buildOutboundEnvelope(packet, prompt, [], 'Fake ACP agent'), retrieved: [], gaps: [], settingsKey: 'fixture', delivery: 'agent', requiresReview: review,
+      return { draft, packet, envelope: buildOutboundEnvelope(packet, prompt, [], 'Fake ACP agent'), retrieved: [], gaps: [], settingsKey: 'fixture', delivery: 'agent', requiresReview: review, facts: fixture.facts,
         truth: previous?.truth || { languageId: source.languageId, sentFilePath: source.filePath, sentFileLabel: source.label, sentStartLine: source.startLine, sentEndLine: source.endLine,
           sentCode: packet.selectedText, knownFiles: ['src/AudioManager.tsx'], knownSymbols: [] } };
     },
@@ -178,15 +178,19 @@ test('oversized guidance is inline; state updates keep caret, text and scroll', 
 test('streaming preserves focus and disclosure; Stop retains incomplete text and rejects late output', async ({ page }) => {
   const h = await mount(page, false, true, true);
   await page.locator('#explanation-send').click();
-  await expect(page.locator('.turn-stop')).toBeVisible();
-  await expect(page.locator('#explanation-stop')).toBeHidden(); // one Stop: the one next to the answer
+  await expect(page.locator('#composer-stop')).toBeVisible();
+  await expect(page.locator('#explanation-stop')).toBeHidden(); // one Stop while printing: the composer's
+  await expect(page.locator('#setup-card')).toBeHidden(); // setup folds away as soon as the answer starts
+  await expect(page.locator('#explain-pinned')).toHaveClass(/is-pinned/);
+  await expect(page.locator('#followup-question')).toBeDisabled();
+  await page.locator('#setup-edit').click(); // reopened mid-stream, re-renders must keep focus and disclosure
   await page.locator('#captured-details summary').click();
   await page.locator('#explanation-guidance').focus();
   h.lateChunk('A longer streamed explanation.');
   await expect(page.locator('#explain-content')).toContainText('A longer streamed explanation.');
   await expect(page.locator('#explanation-guidance')).toBeFocused();
   await expect(page.locator('#captured-details')).toHaveAttribute('open', '');
-  await page.locator('.turn-stop').click();
+  await page.locator('#composer-stop').click();
   await expect(page.locator('#explain-content')).toContainText('incomplete');
   await expect(page.locator('#answer-live')).toContainText('incomplete');
   h.lateChunk('WRONG LATE OUTPUT'); h.finish();
@@ -216,7 +220,8 @@ test('keyboard reaches Explain; a large prompt stays scrollable in a short narro
 test('re-rendered controls keep focus: stream Stop, tour Next, and the overflow menu', async ({ page }) => {
   const h = await mount(page, false, true, true);
   await page.locator('#explanation-send').click();
-  const stop = page.locator('.turn-stop');
+  const stop = page.locator('#composer-stop');
+  await expect(stop).toBeVisible(); // focus() only waits for attachment; a hidden button can't take focus
   await stop.focus();
   h.lateChunk('More streamed text.');
   await expect(page.locator('#explain-content')).toContainText('More streamed text.');
@@ -285,6 +290,49 @@ test('setup folds into a summary after an answer; Edit reopens it; goal and pill
   expect(h.errors).toEqual([]);
 });
 
+test('chat layout: setup and facts fold at send, the answer starts at the top, the composer stays at the bottom', async ({ page }) => {
+  await page.setViewportSize({ width: 700, height: 640 });
+  const long = Array.from({ length: 40 }, (_, i) => `Paragraph ${i + 1} explains one more detail of the code.`).join('\n\n');
+  const h = await mount(page, false, true, true, { facts: { symbol: 'AudioDataBar', kind: 'function' }, firstChunk: '## Start of the answer\n\n' + long });
+  await expect(page.locator('.facts-fold')).toHaveAttribute('open', '');
+  await page.locator('#explanation-send').click();
+  await expect(page.locator('#setup-card')).toBeHidden();
+  await expect(page.locator('.facts-fold')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#explain-content')).toContainText('Paragraph 40');
+  const gap = await page.evaluate(() => {
+    const pinned = document.getElementById('explain-pinned').getBoundingClientRect();
+    return document.querySelector('#explain-content article').getBoundingClientRect().top - pinned.bottom;
+  });
+  expect(gap).toBeGreaterThanOrEqual(0); // the answer is not under the bars…
+  expect(gap).toBeLessThan(40); // …and starts right below them
+  const fillsHeight = await page.evaluate(() => Math.abs(document.getElementById('followup-form').getBoundingClientRect().bottom - innerHeight) <= 1);
+  expect(fillsHeight).toBeTruthy(); // the composer sits on the sidebar's bottom edge
+  await expect(page.locator('#jump-latest')).toBeVisible();
+  await page.locator('#jump-latest').click();
+  await expect(page.locator('#jump-latest')).toBeHidden();
+  await page.setViewportSize({ width: 320, height: 380 });
+  await expect(page.locator('#composer-stop')).toBeInViewport();
+  await expect(page.locator('#explain-pinned')).toBeInViewport();
+  expect(await page.evaluate(() => document.getElementById('explain-workspace').clientHeight)).toBeGreaterThan(100);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  h.finish();
+  await expect(page.locator('#followup-send')).toBeVisible();
+  // A follow-up under a long answer also starts at the top, not below the fold.
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.locator('#followup-question').fill('And the next part?');
+  await page.locator('#followup-send').click();
+  await expect(page.locator('#explain-content article')).toHaveCount(2);
+  await expect(page.locator('#explain-content article').nth(1)).toContainText('Paragraph 40');
+  const followGap = await page.evaluate(() => {
+    const pinned = document.getElementById('explain-pinned').getBoundingClientRect();
+    return document.querySelectorAll('#explain-content article')[1].getBoundingClientRect().top - pinned.bottom;
+  });
+  expect(followGap).toBeGreaterThanOrEqual(0);
+  expect(followGap).toBeLessThan(40);
+  h.finish();
+  expect(h.errors).toEqual([]);
+});
+
 // Design-review screenshots: SCREENSHOTS=<output dir> npx playwright test -g screenshots
 const APPCONFIG = {
   source: { uri: 'file:///Users/me/Developer/demo-app/DemoApp/App/AppConfig.swift', filePath: '/Users/me/Developer/demo-app/DemoApp/App/AppConfig.swift',
@@ -307,19 +355,21 @@ for (const theme of ['vscode-dark', '', 'vscode-high-contrast']) {
     test(`screenshots ${theme || 'light'} ${width}px`, async ({ page }) => {
       test.skip(!process.env.SCREENSHOTS, 'design screenshots only');
       // Outside test-results/, which Playwright clears on every run.
-      await page.setViewportSize({ width, height: 1500 });
-      const h = await mount(page, false, true, true, APPCONFIG);
+      await page.setViewportSize({ width, height: width === 320 ? 640 : 820 }); // a real sidebar height
+      const h = await mount(page, false, true, true, { ...APPCONFIG, facts: { symbol: 'AppConfig', kind: 'enum', kindMeaning: 'A type with a fixed set of cases.' } });
       await page.evaluate(theme => document.body.className = theme, theme);
       const name = `${process.env.SCREENSHOTS}/${theme || 'light'}-${width}`;
       await page.locator('#explanation-guidance').fill('ELI5');
       await expect(page.locator('#explanation-send')).toBeEnabled();
       await page.screenshot({ path: `${name}-1-prepared.png` });
       await page.locator('#explanation-send').click();
-      await expect(page.locator('.turn-stop')).toBeVisible();
+      await expect(page.locator('#composer-stop')).toBeVisible();
       await page.screenshot({ path: `${name}-2-streaming.png` });
       h.finish();
       await expect(page.locator('#setup-summary')).toBeVisible();
       await page.screenshot({ path: `${name}-3-answered.png` });
+      await page.setViewportSize({ width, height: 420 }); // a short or zoomed sidebar
+      await page.screenshot({ path: `${name}-4-short.png` });
       expect(h.errors).toEqual([]);
     });
   }

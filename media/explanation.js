@@ -137,21 +137,63 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
     }
     $('inspector-back').focus({ preventScroll: true });
   }
-  /** Once an answer is done, setup folds into a one-line summary; Edit reopens it. */
+  /** Is a request on screen (sending, printing, or answered)? Failed/stopped reopens setup for Retry. */
+  function answering() {
+    const last = state.turns.at(-1);
+    return Boolean(last) && ['sending', 'streaming', 'done'].includes(state.phase) && last.status !== 'failed' && last.status !== 'cancelled';
+  }
+  /** As soon as you press Explain, setup folds into a one-line bar pinned at the top; Edit reopens it. */
   function renderSetup() {
-    const answered = state.phase === 'done' && state.turns.some(t => t.status === 'done' || t.status === 'handed-off');
+    const answered = answering();
     const collapsed = answered && !editing;
     $('setup-card').hidden = collapsed;
     $('setup-summary').hidden = !answered;
+    $('explain-pinned').classList.toggle('is-pinned', collapsed);
     $('setup-edit').setAttribute('aria-expanded', String(!collapsed));
     text('setup-edit', collapsed ? 'Edit' : 'Done');
     const o = options(), source = state.draft?.source;
     const lines = source ? (source.focus === 'selection' ? ` ${source.startLine}–${source.endLine}` : ' (whole file)') : '';
     text('setup-summary-text', [goalInput()?.nextElementSibling?.textContent, o.guidance.trim() || 'No guidance', source ? source.label + lines : ''].filter(Boolean).join(' · '));
-    const reason = answered && editing ? 'Change the goal, question, or guidance to explain again, or ask a follow-up below.' : '';
+    const reason = answered && editing && state.phase === 'done' ? 'Change the goal, question, or guidance to explain again, or ask a follow-up below.' : '';
     $('send-reason').hidden = !reason;
     text('send-reason', reason);
   }
+  /**
+   * Chat scrolling: a new answer starts just under the pinned bars and grows downward, so you
+   * read from its first line. The newest turn gets a viewport-high minimum so it can sit at the top.
+   */
+  function newestTurn() { return $('explain-content').lastElementChild; }
+  /** How much of the scroller's top the pinned bars cover, measured rather than derived from CSS. */
+  function pinnedCover() {
+    return $('explain-pinned').getBoundingClientRect().bottom - workspace.getBoundingClientRect().top;
+  }
+  function sizeNewestTurn() {
+    const turn = newestTurn();
+    for (const article of $('explain-content').children) { if (article !== turn) { article.style.minHeight = ''; } }
+    if (turn) { turn.style.minHeight = Math.max(0, workspace.clientHeight - pinnedCover() - 24) + 'px'; }
+  }
+  function showNewestTurn() {
+    const turn = newestTurn();
+    if (!turn) { return; }
+    sizeNewestTurn();
+    workspace.scrollTop += turn.getBoundingClientRect().top - workspace.getBoundingClientRect().top - pinnedCover() - 8;
+  }
+  /** "↓ Latest" when the newest answer's text continues below the visible area. */
+  function updateLatest() {
+    const body = newestTurn()?.querySelector('.turn-answer');
+    const below = body ? body.getBoundingClientRect().bottom - workspace.getBoundingClientRect().bottom : 0;
+    $('jump-latest').hidden = !(below > 16) || !inspector.hidden;
+  }
+  $('jump-latest').addEventListener('click', () => {
+    const body = newestTurn()?.querySelector('.turn-answer');
+    if (!body) { return; }
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches || document.body.classList.contains('vscode-reduce-motion');
+    const top = workspace.scrollTop + body.getBoundingClientRect().bottom - workspace.getBoundingClientRect().bottom + 24;
+    workspace.scrollTo({ top, behavior: reduce ? 'auto' : 'smooth' });
+  });
+  workspace.addEventListener('scroll', updateLatest, { passive: true });
+  if ('ResizeObserver' in window) { new ResizeObserver(() => { sizeNewestTurn(); updateLatest(); }).observe(workspace); }
+
   window.addEventListener('message', event => {
     if (event.data?.type === 'explanationError') { text('explanation-notice', event.data.error); }
   });
@@ -200,8 +242,13 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
       const copyNotice = state.notice || state.guidanceNotice || '';
       if (/copied/i.test(copyNotice)) { text('inspector-status', copyNotice); }
       const busy = ['preparing', 'sending', 'streaming'].includes(state.phase);
-      // While an answer streams, its own Stop sits next to it; this one covers preparing.
-      $('explanation-stop').hidden = !busy || state.turns.some(t => ['sending', 'streaming'].includes(t.status));
+      // The composer's Stop covers a printing answer; this one covers preparing.
+      const printing = ['sending', 'streaming'].includes(state.phase);
+      $('explanation-stop').hidden = state.phase !== 'preparing';
+      $('composer-stop').hidden = !printing;
+      $('followup-send').hidden = printing;
+      $('followup-question').disabled = printing;
+      $('followup-question').placeholder = printing ? 'Ask a follow-up when this finishes' : '';
       const matches = d && JSON.stringify(options()) === JSON.stringify(d.options);
       $('explanation-send').disabled = !p || busy || !valid() || !matches || !!timer || state.phase === 'done';
       $('inspect-prepared').disabled = !p || !!timer || !matches;
@@ -218,25 +265,32 @@ window.createExplanationView = function (vscode, selectTab, renderAnswer) {
         let article = answers.querySelector('[data-turn="' + turn.id + '"]');
         if (!article) {
           article = document.createElement('article'); article.dataset.turn = String(turn.id);
-          const heading = document.createElement('h2'), button = document.createElement('button'), body = document.createElement('div'), status = document.createElement('p'), stop = document.createElement('button');
+          const heading = document.createElement('h2'), button = document.createElement('button'), body = document.createElement('div'), status = document.createElement('p');
           heading.textContent = turn.goalLabel + ' · ' + turn.request.draft.source.label;
           heading.className = 'turn-title';
           button.className = 'link-btn'; button.textContent = 'What was sent'; button.addEventListener('click', () => openInspector(state.turns.find(t => t.id === turn.id)));
           body.className = 'turn-answer'; status.className = 'turn-status';
           const meta = document.createElement('div'); meta.className = 'turn-meta'; meta.append(status, button);
-          // Stop lives outside the streamed markup so it keeps focus while text arrives.
-          stop.className = 'btn turn-stop'; stop.textContent = 'Stop'; stop.dataset.explanation = 'cancel';
-          article.append(heading, meta, body, stop); answers.append(article);
+          article.append(heading, meta, body); answers.append(article);
         }
         const body = article.querySelector('.turn-answer'), html = renderAnswer(turn, snapshot);
         if (body.dataset.rendered !== html) { body.innerHTML = html; body.dataset.rendered = html; }
         article.querySelector('.turn-status').textContent = turn.detail || STATUS[turn.status] || turn.status;
-        article.querySelector('.turn-stop').hidden = !['sending', 'streaming'].includes(turn.status);
       });
-      $('followup-form').hidden = busy || !state.turns.some(t => t.session === d?.session && t.status === 'done') || !p;
-      if (state.turns.length > lastTurnCount) { editing = false; }
+      // Chat composer: shown once this explanation has a turn; disabled with Stop while printing.
+      // Depends only on turns: hiding it even for one render would drop focus from Stop.
+      $('followup-form').hidden = !state.turns.length || (d !== undefined && !state.turns.some(t => t.session === d.session));
+      const newTurn = state.turns.length > lastTurnCount;
+      if (newTurn) {
+        editing = false;
+        // Facts fold away with setup; dashboard.js records the choice from the toggle event.
+        const facts = $('facts-rail').querySelector('details');
+        if (facts && facts.open) { facts.open = false; facts.dispatchEvent(new Event('toggle')); }
+      }
       lastTurnCount = state.turns.length;
       renderSetup();
+      if (newTurn && restored) { showNewestTurn(); }
+      updateLatest();
       if (!restored) {
         if (presentation && d && presentation.session === d.session) {
           $('captured-details').open = !!presentation.codeOpen;

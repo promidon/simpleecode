@@ -79,78 +79,69 @@ export function getDashboardHtml(
     <section class="panel is-active" id="panel-explain" role="tabpanel"
       aria-labelledby="tab-explain" tabindex="-1">
       <div id="explain-workspace" class="explain-workspace">
-        <div id="setup-summary" class="setup-summary" hidden>
-          <span id="setup-summary-text" class="setup-summary-text"></span>
-          <button class="link-btn" id="setup-edit" aria-controls="setup-card" aria-expanded="false">Edit</button>
-        </div>
-        <section id="setup-card" class="setup-card" aria-labelledby="setup-title">
-          <h2 id="setup-title" class="sr-only">Prepare an explanation</h2>
-          <div class="source-row">
-            <div class="context-bar" id="context-bar"></div>
-            <details class="source-menu" id="source-menu">
-              <summary class="btn btn-sm">Change</summary>
-              <div class="source-menu-list">
-                <button class="menu-row" data-explanation="selection">Use current selection</button>
-                <button class="menu-row" data-explanation="file">Use current file</button>
-                <button class="menu-row" data-explanation="refresh">Refresh source</button>
-              </div>
-            </details>
+        <div id="explain-pinned" class="pinned">
+          <div id="setup-summary" class="setup-summary" hidden>
+            <span id="setup-summary-text" class="setup-summary-text"></span>
+            <button class="link-btn" id="setup-edit" aria-controls="setup-card" aria-expanded="false">Edit</button>
           </div>
-          <p id="source-change" class="notice" hidden>Source changed since capture. Use Change → Refresh source to explain the current version.</p>
-          <details id="captured-details" class="fold"><summary>Captured code</summary><pre id="captured-code"></pre></details>
-          <div class="explanation-controls">
-            <fieldset class="goal-field" aria-describedby="goal-description">
-              <legend>Goal</legend>
-              <div class="segmented" id="explanation-goal">
-                ${Object.entries(GOALS).map(([id, goal]) => `<label class="seg"><input type="radio" name="explanation-goal" value="${id}"${id === 'understand' ? ' checked' : ''}><span>${goal.short}</span></label>`).join('')}
-              </div>
-              <p id="goal-description" class="hint"></p>
-            </fieldset>
-            <label for="explanation-question">Question or symptom <span class="optional">optional</span></label>
-            <textarea id="explanation-question" rows="2" maxlength="20000"></textarea>
-            <label for="explanation-guidance">How should it be explained? <span class="optional">optional</span></label>
-            <textarea id="explanation-guidance" rows="2" aria-describedby="guidance-help guidance-error"></textarea>
-            <div class="pill-row" id="guidance-pills" aria-label="Guidance suggestions" role="group">
-              <button class="pill" data-guidance="ELI5">ELI5</button>
-              <button class="pill" data-guidance="Keep it brief">Keep it brief</button>
-              <button class="pill" id="guidance-language" data-guidance="I’m new to this language" hidden>New to this language</button>
-              <button class="pill pill-quiet" id="save-guidance">Save as my default</button>
-              <button class="pill pill-quiet" data-explanation="removeGuidance" id="remove-guidance">Remove saved default</button>
+          <section id="setup-card" class="setup-card" aria-labelledby="setup-title">
+            <h2 id="setup-title" class="sr-only">Prepare an explanation</h2>
+            <div class="source-row">
+              <div class="context-bar" id="context-bar"></div>
+              <details class="source-menu" id="source-menu">
+                <summary class="btn btn-sm">Change</summary>
+                <div class="source-menu-list">
+                  <button class="menu-row" data-explanation="selection">Use current selection</button>
+                  <button class="menu-row" data-explanation="file">Use current file</button>
+                  <button class="menu-row" data-explanation="refresh">Refresh source</button>
+                </div>
+              </details>
             </div>
-            <p id="guidance-help" class="hint">Up to 2,000 characters. Saved defaults stay on this device.</p>
-            <p id="guidance-error" class="field-error" role="alert" hidden>Use at most 2,000 guidance characters.</p>
-            <p id="guidance-notice" class="notice" role="status"></p>
-            <div id="guidance-confirmation" class="confirm" hidden><pre id="safe-guidance"></pre><button class="btn" id="confirm-guidance">Save this sanitized default</button></div>
-          </div>
-          <div class="privacy-line">
-            <span class="privacy-icon" aria-hidden="true">${shieldSvg}</span>
-            <p id="sharing-summary"></p>
-          </div>
-          <details id="gaps-details" class="fold" hidden><summary id="gaps-summary">What the answer can’t see</summary><div id="preparation-gaps"></div></details>
-          <button class="link-btn" id="context-settings" data-command="workbench.action.openSettings" hidden>Review context settings</button>
-          <p id="explanation-notice" class="notice" role="status"></p>
-          <div class="action-row">
-            <button class="primary-btn" id="explanation-send" disabled>Explain</button>
-            <button class="btn" id="inspect-prepared" disabled>View prompt</button>
-            <button class="btn" data-explanation="cancel" id="explanation-stop" hidden>Stop</button>
-          </div>
-          <p id="send-reason" class="hint" hidden></p>
-        </section>
-        <aside id="facts-rail" aria-label="Captured context and facts"></aside>
+            <p id="source-change" class="notice" hidden>Source changed since capture. Use Change → Refresh source to explain the current version.</p>
+            <details id="captured-details" class="fold"><summary>Captured code</summary><pre id="captured-code"></pre></details>
+            <div class="explanation-controls">
+              <fieldset class="goal-field" aria-describedby="goal-description">
+                <legend>Goal</legend>
+                <div class="segmented" id="explanation-goal">
+                  ${Object.entries(GOALS).map(([id, goal]) => `<label class="seg"><input type="radio" name="explanation-goal" value="${id}"${id === 'understand' ? ' checked' : ''}><span>${goal.short}</span></label>`).join('')}
+                </div>
+                <p id="goal-description" class="hint"></p>
+              </fieldset>
+              <label for="explanation-question">Question or symptom <span class="optional">optional</span></label>
+              <textarea id="explanation-question" rows="2" maxlength="20000"></textarea>
+              <label for="explanation-guidance">How should it be explained? <span class="optional">optional</span></label>
+              <textarea id="explanation-guidance" rows="2" aria-describedby="guidance-help guidance-error"></textarea>
+              <div class="pill-row" id="guidance-pills" aria-label="Guidance suggestions" role="group">
+                <button class="pill" data-guidance="ELI5">ELI5</button>
+                <button class="pill" data-guidance="Keep it brief">Keep it brief</button>
+                <button class="pill" id="guidance-language" data-guidance="I’m new to this language" hidden>New to this language</button>
+                <button class="pill pill-quiet" id="save-guidance">Save as my default</button>
+                <button class="pill pill-quiet" data-explanation="removeGuidance" id="remove-guidance">Remove saved default</button>
+              </div>
+              <p id="guidance-help" class="hint">Up to 2,000 characters. Saved defaults stay on this device.</p>
+              <p id="guidance-error" class="field-error" role="alert" hidden>Use at most 2,000 guidance characters.</p>
+              <p id="guidance-notice" class="notice" role="status"></p>
+              <div id="guidance-confirmation" class="confirm" hidden><pre id="safe-guidance"></pre><button class="btn" id="confirm-guidance">Save this sanitized default</button></div>
+            </div>
+            <div class="privacy-line">
+              <span class="privacy-icon" aria-hidden="true">${shieldSvg}</span>
+              <p id="sharing-summary"></p>
+            </div>
+            <details id="gaps-details" class="fold" hidden><summary id="gaps-summary">What the answer can’t see</summary><div id="preparation-gaps"></div></details>
+            <button class="link-btn" id="context-settings" data-command="workbench.action.openSettings" hidden>Review context settings</button>
+            <p id="explanation-notice" class="notice" role="status"></p>
+            <div class="action-row">
+              <button class="primary-btn" id="explanation-send" disabled>Explain</button>
+              <button class="btn" id="inspect-prepared" disabled>View prompt</button>
+              <button class="btn" data-explanation="cancel" id="explanation-stop" hidden>Stop</button>
+            </div>
+            <p id="send-reason" class="hint" hidden></p>
+          </section>
+          <aside id="facts-rail" aria-label="Captured context and facts"></aside>
+        </div>
         <details id="local-explanation-details" class="fold" hidden><summary>Local explanation (no AI)</summary><div id="local-explanation"></div></details>
         <div id="explain-content"></div>
-        <form id="followup-form" class="followup" hidden>
-          <label for="followup-question">Ask about this explanation</label>
-          <div class="followup-row">
-            <textarea id="followup-question" rows="2" maxlength="20000" aria-describedby="followup-help"></textarea>
-            <button class="primary-btn icon-only" type="submit" aria-label="Ask follow-up"><span aria-hidden="true">${arrowUpSvg}</span></button>
-          </div>
-          <p id="followup-help" class="hint">Uses this explanation’s code, goal, guidance, and earlier replies.</p>
-          <div class="link-row">
-            <button class="link-btn" type="button" id="review-followup">Review follow-up first</button>
-            <button class="link-btn" type="button" data-explanation="new">New explanation</button>
-          </div>
-        </form>
+        <button class="jump-latest" id="jump-latest" type="button" hidden>↓ Latest</button>
       </div>
       <section id="explanation-inspector" class="explanation-inspector" aria-labelledby="inspector-title" hidden>
         <button class="btn" id="inspector-back">Back to explanation</button>
@@ -164,6 +155,19 @@ export function getDashboardHtml(
         <details id="complete-prompt"><summary>Complete prompt</summary><pre id="inspector-prompt"></pre></details>
         <div id="inspector-history"></div>
       </section>
+      <form id="followup-form" class="followup" hidden>
+        <label for="followup-question">Ask about this explanation</label>
+        <div class="followup-row">
+          <textarea id="followup-question" rows="2" maxlength="20000" aria-describedby="followup-help"></textarea>
+          <button class="primary-btn icon-only" id="followup-send" type="submit" aria-label="Ask follow-up"><span aria-hidden="true">${arrowUpSvg}</span></button>
+          <button class="btn" id="composer-stop" type="button" data-explanation="cancel" hidden>Stop</button>
+        </div>
+        <p id="followup-help" class="hint">Uses this explanation’s code, goal, guidance, and earlier replies.</p>
+        <div class="link-row">
+          <button class="link-btn" type="button" id="review-followup">Review follow-up first</button>
+          <button class="link-btn" type="button" data-explanation="new">New explanation</button>
+        </div>
+      </form>
     </section>
 
     <section class="panel" id="panel-check" role="tabpanel"

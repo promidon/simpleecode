@@ -2,7 +2,7 @@
   "name": "simpleecode",
   "displayName": "SimpleeCode",
   "description": "SimpleeCode is a local VS Code extension that explains your codebase in plain language, grounded in your actual code.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "promidon",
   "private": true,
   "license": "GPL-3.0-or-later",
