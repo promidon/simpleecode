@@ -20,15 +20,17 @@ interface ParentSymbol {
   namePosition: { line: number; character: number };
 }
 
-export async function getParentSymbol(): Promise<ParentSymbol | undefined> {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) {
+export async function getParentSymbol(
+  uri = vscode.window.activeTextEditor?.document.uri,
+  selection = vscode.window.activeTextEditor?.selection,
+): Promise<ParentSymbol | undefined> {
+  if (!uri || !selection) {
     return undefined;
   }
 
   const result = await vscode.commands.executeCommand<
     vscode.DocumentSymbol[] | vscode.SymbolInformation[]
-  >('vscode.executeDocumentSymbolProvider', editor.document.uri);
+  >('vscode.executeDocumentSymbolProvider', uri);
 
   if (!Array.isArray(result) || result.length === 0) {
     return undefined;
@@ -39,7 +41,7 @@ export async function getParentSymbol(): Promise<ParentSymbol | undefined> {
   // sits just above the symbol's own range; the start is the fallback for
   // selections that run past the bottom of a symbol. Providers return
   // DocumentSymbol[] (a tree) or the older flat SymbolInformation[] — handle both.
-  const { start, end } = editor.selection;
+  const { start, end } = selection;
   const probe = (p: vscode.Position): ParentSymbol | undefined =>
     isDocumentSymbolArray(result)
       ? findInnermostDocumentSymbol(result, p)

@@ -15,6 +15,8 @@ feel safe here, or the whole point is lost.
 
 ## Get it running
 
+You need Node.js 22 or later (packaging with `@vscode/vsce` requires it).
+
 ```bash
 git clone https://github.com/promidon/simpleecode.git
 cd simpleecode
@@ -29,20 +31,35 @@ Open any project in it and run a `SimpleeCode:` command from the Command Palette
 Optional, but nice: `npm i -g @zed-industries/claude-code-acp` so answers stream
 live instead of going to your clipboard.
 
-## The three checks
+## Verification
 
-Run these before you open a PR. All three should be green.
+Run the repository gates before proposing a release. Report each result separately.
 
 ```bash
-npm run compile   # tsc → out/
+npm run dead-code
+npm run typecheck
 npm run lint
-npm test          # compiles, then runs node:test unit tests
+npm test
+npm audit --json
+npm run package
+git diff --check
 ```
 
 If a check fails on `main` and not because of your change, open an issue — that's
 a real bug and worth knowing about.
 
 ---
+
+For dashboard work, also run `npx playwright install chromium` and
+`npm run test:browser`. Run `npm run test:extension` for an isolated VS Code
+host using a synthetic ACP process, not a paid model. Override
+`SIMPLEECODE_TEST_CODE` with your local VS Code executable when necessary.
+See [the acceptance checklist](docs/explanation-acceptance.md) for manual gates.
+
+After packaging, `node scripts/test-installed.mjs simpleecode-0.2.0.vsix`
+installs and activates the artifact in a new temporary profile. Pass an existing
+0.1.0 VSIX as a second argument to test installation over that version with saved
+settings. This never changes your normal profile and is not an HTTPS updater test.
 
 ## How the project thinks
 
@@ -65,11 +82,12 @@ So: if a feature needs the model to *invent* a fact, it needs a rethink. Ask
 ### 2. Privacy is not optional
 
 Nothing new leaves the machine without going through the privacy guard and the
-prompt review. If your change adds anything to a prompt, to telemetry, or to a
+inspectable context and an explicit send/copy action. If your change adds anything to a prompt, to telemetry, or to a
 network request, it has to:
 
 - pass through the privacy guard (`src/privacy/`)
-- show up in the prompt review the user sees before sending
+- appear in the optional inspector as exactly the payload sent
+- honor explicitly enabled inline review
 - respect `simpleecode.privacy.*` settings, including blocked globs and scope
 
 Adding a new outbound request? Flag it clearly in the PR description.
@@ -100,7 +118,8 @@ src/
   extension.ts              # activation, wiring, live dashboard refresh
   app/SimpleeCodeApp.ts     # shared service container
   acp/                      # ACP adapter boundary (interface + vscode-acp impl)
-  context/                  # active editor, selection, ContextPacket, packet builder
+  context/                  # ContextPacket, captured-code facts, packet builder
+  explanation/              # immutable requests, goal policies, host-owned sessions
   prompt/                   # structured prompt builder (pure)
   privacy/                  # privacy guard (pure) + settings reader
   dashboard/                # webview panel (media/ holds css + js)
@@ -124,7 +143,7 @@ interface.
    `add-python-facts`.
 2. Keep it small. One change per PR. Small PRs get reviewed faster.
 3. Add a test if you touched pure logic.
-4. Run the three checks.
+4. Run the verification gates.
 5. Describe what changed and *why*, and say how you tested it by hand.
 
 Screenshots help a lot for anything that touches the dashboard.

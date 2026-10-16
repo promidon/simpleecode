@@ -2,7 +2,7 @@
   "name": "simpleecode",
   "displayName": "SimpleeCode",
   "description": "SimpleeCode is a local VS Code extension that explains your codebase in plain language, grounded in your actual code.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "promidon",
   "private": true,
   "license": "GPL-3.0-or-later",
@@ -111,6 +111,20 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "simpleecode.explainBeginner",
+          "when": "false"
+        },
+        {
+          "command": "simpleecode.explainDetailed",
+          "when": "false"
+        },
+        {
+          "command": "simpleecode.explainDebug",
+          "when": "false"
+        }
+      ],
       "editor/context": [
         {
           "command": "simpleecode.explainSelection",
@@ -139,9 +153,9 @@
             "commands"
           ],
           "enumDescriptions": [
-            "Use the spawned ACP agent when its command is on PATH; otherwise fall back to the vscode-acp extension commands.",
+            "Prepare agent delivery when its command is on PATH; otherwise offer an explicit external-chat handoff.",
             "Always spawn the ACP agent process (real delivery; answers stream into the dashboard).",
-            "Always use the vscode-acp extension commands (clipboard safety net)."
+            "Prepare an explicit external-chat handoff; clipboard transfer requires the Copy prompt and open chat action."
           ],
           "default": "auto",
           "description": "How SimpleeCode talks to Claude Code."
@@ -195,7 +209,7 @@
             "clipboard"
           ],
           "enumDescriptions": [
-            "Try to pass the prompt to the ACP send command; if that is not supported, fall back to copying the prompt to the clipboard and opening the chat panel.",
+            "Offer Copy prompt and open chat for explicit manual paste. No send command is attempted automatically.",
             "Only call the ACP send command (best when the command accepts a prompt argument).",
             "Always copy the prompt to the clipboard and open the chat panel for manual paste."
           ],
@@ -245,8 +259,8 @@
         },
         "simpleecode.privacy.showPromptBeforeSending": {
           "type": "boolean",
-          "default": true,
-          "description": "Show a confirmation preview of exactly what will be sent to Claude before sending."
+          "default": false,
+          "description": "Require an extra inline review and approval before sending. The complete prompt is always inspectable in the sidebar; no blocking modal is used."
         },
         "simpleecode.privacy.maxFileBytes": {
           "type": "number",
@@ -288,12 +302,14 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\" && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "typecheck": "tsc --noEmit -p ./",
     "lint": "eslint src",
-    "dead-code": "fallow --no-cache dead-code",
+    "dead-code": "npm run compile && fallow --no-cache dead-code",
     "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
+    "test:browser": "npm run compile && playwright test tests/browser --workers=1",
+    "test:extension": "npm run compile && node scripts/test-extension.mjs",
     "package": "vsce package",
     "release:prepare": "./scripts/release.sh prepare",
     "release:prepare-site": "./scripts/release.sh prepare-site",
@@ -303,10 +319,13 @@
     "deploy:production": "./scripts/release.sh deploy-production"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.13.0",
-    "@vscode/vsce": "^3.2.0",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.7.0",
     "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
     "eslint": "^9.13.0",
     "fallow": "2.45.1",
     "typescript": "^5.6.0",

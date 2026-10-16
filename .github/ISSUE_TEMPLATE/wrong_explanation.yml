@@ -46,5 +46,10 @@ body:
   - type: input
     id: mode
     attributes:
-      label: Which command and mode?
-      placeholder: Explain Selection, Beginner mode
+      label: Which command, goal, and version?
+      placeholder: Explain Selection, Understand, SimpleeCode 0.2.0
+  - type: textarea
+    id: guidance
+    attributes:
+      label: Explanation guidance and context limits (optional)
+      description: Describe the style requested and any missing-context notice. Do not paste private prompts, paths, or source.

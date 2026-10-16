@@ -1,4 +1,6 @@
 import type { ContextPacket } from '../context/ContextPacket';
+import type { PrivacyConfig } from '../privacy/privacyGuard';
+import type { FileIndexReader } from '../indexing/FileIndex';
 
 /**
  * Retrieval boundary. The live implementation is deterministic: imports,
@@ -14,9 +16,10 @@ export interface RetrievedContext {
   /** Privacy changes applied to this specific retrieved item. */
   redactions?: string[];
   truncated?: boolean;
+  version?: number;
 }
 
 export interface Retriever {
   /** Given a base packet, return extra context to enrich it. */
-  retrieve(packet: ContextPacket): Promise<RetrievedContext[]>;
+  retrieve(packet: ContextPacket, config: PrivacyConfig, sparseSearch: boolean, index?: FileIndexReader): Promise<RetrievedContext[]>;
 }

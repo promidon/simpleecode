@@ -1,0 +1,8 @@
+{
+  "name": "simpleecode-install-probe",
+  "publisher": "local-test",
+  "version": "0.0.0",
+  "engines": { "vscode": "^1.90.0" },
+  "main": "./extension.cjs",
+  "activationEvents": ["onStartupFinished"]
+}

@@ -1,3 +1,5 @@
+import { ExplanationService } from './explanation/ExplanationService';
+import { GOALS } from './explanation/model';
 import * as vscode from 'vscode';
 import { Logger } from './utils/logger';
 import { AcpRouter } from './acp/AcpRouter';
@@ -7,44 +9,28 @@ import { JsonStore } from './storage/JsonStore';
 import { registerCommands } from './commands/registerCommands';
 import { UpdateChecker } from './update/UpdateChecker';
 import { submitFeedback } from './feedback/submitFeedback';
+import { readFeedbackConfig } from './feedback/feedbackConfig';
 import {
   DashboardPanel,
   type DashboardState,
 } from './dashboard/DashboardPanel';
 import { DashboardView } from './dashboard/DashboardView';
-import { getActiveEditorSnapshot } from './context/ActiveEditorContext';
-import { getSelectionSnapshot } from './context/SelectionContext';
-import { getParentSymbol } from './context/parentSymbol';
-import { explainSymbolViaLsp } from './context/codeFacts';
-import {
-  generateExplanation,
-  explainSelection,
-} from './context/generateExplanation';
 import { swiftDocLinks } from './rag/swiftDocs';
-import { verifyAnswer, type AnswerGroundTruth } from './rag/verifyAnswer';
 import { describeSystemRole } from './rag/systemRole';
 import { planTour, type TourStop } from './rag/tour';
 import { markdownToHtml } from './utils/markdownToHtml';
 import { openExternalUrl } from './utils/openExternalUrl';
-import type { ContextPacket } from './context/ContextPacket';
 import type { SimpleeCodeApp } from './app/SimpleeCodeApp';
 import type { DashboardPhase } from './dashboard/DashboardPanel';
-import type { ExplanationMode } from './prompt/promptBuilder';
 import { DeterministicRetriever } from './rag/DeterministicRetriever';
 import { shutdown } from './utils/shutdown';
-
-const NEXT_STEPS = [
-  '#18 Hybrid ranking (dedupe + rank across retrieval stages)',
-  'Slice 5: fetch real doc pages + quote-check the answer',
-  'Dense-embedding backend behind vectorSearch (optional)',
-];
 
 // Owned by deactivate(), not context.subscriptions: VS Code disposes
 // subscriptions synchronously the moment deactivate() is called, which would
 // close the logger while the store's async flush is still in flight.
 let lifecycle: { store: JsonStore; logger: Logger } | undefined;
 
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(context: vscode.ExtensionContext) {
   const logger = new Logger();
   logger.info('SimpleeCode activating.');
 
@@ -58,172 +44,57 @@ export function activate(context: vscode.ExtensionContext): void {
   const symbolIndex = new SymbolIndex(logger, store);
   const retriever = new DeterministicRetriever(fileIndex, symbolIndex, logger);
 
-  let lastPacket: DashboardState['lastPacket'] | undefined;
-  let lastRetrieved: DashboardState['retrieved'];
-  let lastFacts: DashboardState['facts'];
-  let lastAnswer: DashboardState['answer'];
-  let lastContextGaps: string[] | undefined;
-  let lastSentPacket: ContextPacket | undefined;
   let tour: { stops: TourStop[]; total: number; index: number } | undefined;
   let phase: DashboardPhase = 'indexing';
-  let explanationMode: ExplanationMode = 'detailed';
-
-  // Streaming answers arrive many times a second; refresh at most ~4×/s.
   let answerThrottle: ReturnType<typeof setTimeout> | undefined;
-
+  const explanation = new ExplanationService(context, fileIndex, symbolIndex, retriever, adapter, () => {
+    if (!answerThrottle) {
+      answerThrottle = setTimeout(() => { answerThrottle = undefined; app.refreshDashboard(); }, 60);
+    }
+  });
   const app: SimpleeCodeApp = {
-    logger,
-    adapter,
-    fileIndex,
-    symbolIndex,
-    retriever,
+    logger, fileIndex, symbolIndex, explanation,
     async getDashboardState(): Promise<DashboardState> {
-      const active = getActiveEditorSnapshot();
-      const selection = getSelectionSnapshot();
-      const parent = active ? await getParentSymbol() : undefined;
       const availability = await adapter.describeAvailability();
-
-      // Deterministic explanation — written from the code's own structure and
-      // doc comments. No language server, no AI. A single selected word resolves
-      // to its declaration; a larger selection is outlined; no selection outlines
-      // the whole file.
-      const fileLabel = active?.relativePath ?? active?.filePath ?? 'this file';
-      let explanation: string | undefined;
-      if (active && selection?.hasSelection) {
-        explanation = explainSelection(
-          selection.selectedText,
-          active.fullText,
-          active.languageId ?? '',
-          fileLabel,
-        );
-        // A single word the glossary + file text couldn't resolve → ask the
-        // engine (LSP). Keywords never reach this: the glossary answers first.
-        const word = selection.selectedText.trim();
-        if (!explanation && /^[A-Za-z_]\w*$/.test(word)) {
-          explanation =
-            (await explainSymbolViaLsp()) ??
-            `${word}\n\nNot declared in this file. The language server didn't resolve it either (a bare Xcode target needs its build server — run "Set Up Swift Engine"). It likely comes from an import or the SDK — open a doc link below.`;
-        }
-      } else if (active) {
-        explanation = generateExplanation(
-          active.fullText,
-          active.languageId ?? '',
-          fileLabel,
-        );
-      }
+      const experience = explanation.coordinator.state;
+      const d = experience.draft;
+      const p = experience.prepared;
+      const last = experience.turns.at(-1);
+      const envelope = p?.envelope;
       return {
-        phase,
-        explanationMode,
-        activeFile: active?.relativePath ?? active?.filePath,
-        languageId: active?.languageId,
-        selection: selection
-          ? {
-              hasSelection: selection.hasSelection,
-              startLine: selection.startLine,
-              endLine: selection.endLine,
-              selectedText: selection.hasSelection
-                ? truncateForDisplay(selection.selectedText)
-                : undefined,
-              parentSymbol: parent
-                ? `${parent.name} (${parent.kind})`
-                : undefined,
-            }
-          : undefined,
+        phase: experience.phase === 'idle' ? phase : experience.phase === 'preparing' ? 'capturing' : experience.phase === 'ready' ? 'idle' : experience.phase,
+        experience: { ...experience, turns: experience.turns.map(t => ({ ...t, html: markdownToHtml(t.text), goalLabel: GOALS[t.request.draft.options.goal].label })),
+          savedGuidance: explanation.savedGuidance, guidanceNotice: explanation.guidanceNotice,
+          pendingGuidance: explanation.pendingGuidance, sourceChanged: explanation.sourceChanged },
+        activeFile: d?.source.label, languageId: d?.source.languageId,
+        selection: d ? { hasSelection: d.source.focus === 'selection', startLine: d.source.startLine,
+          endLine: d.source.endLine, selectedText: truncateForDisplay(d.source.focus === 'selection' ? d.source.selectedText : d.source.fullText) } : undefined,
         acp: { available: availability.available, detail: availability.detail },
-        lastPacket,
-        retrieved: lastRetrieved,
-        index: { files: fileIndex.size, symbols: symbolIndex.size },
-        docs: swiftDocLinks(parent?.name, active?.languageId),
-        facts: lastFacts,
-        answer: lastAnswer
-          ? { ...lastAnswer, html: markdownToHtml(lastAnswer.text) }
-          : undefined,
-        explanation,
-        contextGaps: lastContextGaps,
-        tour: tourView(),
-        nextSteps: NEXT_STEPS,
+        feedbackConfigured: Boolean(readFeedbackConfig().token),
+        lastPacket: envelope ? { task: envelope.task, privacyScope: envelope.privacyScope, filePath: envelope.filePath,
+          byteSize: envelope.totalBytes, truncated: envelope.truncated, redactions: envelope.redactions,
+          promptPreview: envelope.prompt, includedSources: envelope.includedSources, channel: envelope.channel } : undefined,
+        retrieved: p?.retrieved, index: { files: fileIndex.size, symbols: symbolIndex.size },
+        docs: swiftDocLinks(p?.facts?.symbol, d?.source.languageId), facts: p?.facts,
+        answer: last ? { text: last.text, done: !['sending', 'streaming'].includes(last.status),
+          html: markdownToHtml(last.text), verify: last.verify } : undefined,
+        explanation: p?.localExplanation, contextGaps: p?.gaps, tour: tourView(),
       };
     },
-    refreshDashboard(): void {
-      void DashboardPanel.current?.refresh();
-      void dashboardView.refresh();
-    },
-    setLastPacket(packet): void {
-      lastPacket = packet;
-      this.refreshDashboard();
-    },
-    setRetrieved(retrieved): void {
-      lastRetrieved = retrieved;
-      this.refreshDashboard();
-    },
-    setFacts(facts): void {
-      lastFacts = facts;
-      this.refreshDashboard();
-    },
-    setContextGaps(gaps): void {
-      lastContextGaps = gaps.length ? gaps : undefined;
-      this.refreshDashboard();
-    },
-    setAnswer(answer): void {
-      lastAnswer = answer;
-      if (answer && !answer.done) {
-        if (!answerThrottle) {
-          answerThrottle = setTimeout(() => {
-            answerThrottle = undefined;
-            this.refreshDashboard();
-          }, 250);
-        }
-        return;
-      }
-      if (answerThrottle) {
-        clearTimeout(answerThrottle);
-        answerThrottle = undefined;
-      }
-      this.refreshDashboard();
-    },
-    setLastContext(packet): void {
-      lastSentPacket = packet;
-    },
-    setPhase(next): void {
-      phase = next;
-      this.refreshDashboard();
-    },
-    setExplanationMode(mode): void {
-      explanationMode = mode;
-      this.refreshDashboard();
-    },
-    checkAnswer(answerText): ReturnType<SimpleeCodeApp['checkAnswer']> {
-      const p = lastSentPacket;
-      const all = fileIndex.all();
-      const truth: AnswerGroundTruth = {
-        sentFilePath: p?.filePath,
-        sentCode: [p?.selectedText, p?.fullText].filter(Boolean).join('\n'),
-        sentSymbol: p?.symbolName,
-        sentStartLine: p?.startLine,
-        sentEndLine: p?.endLine,
-        knownFiles: all.map((r) => r.path),
-        knownSymbols: [...new Set(all.flatMap((r) => r.exports))],
-        facts: lastFacts
-          ? {
-              symbol: lastFacts.symbol,
-              signature: lastFacts.signature,
-              definition: lastFacts.definition,
-            }
-          : undefined,
-        docText: lastFacts?.doc,
-      };
-      return verifyAnswer(answerText, truth);
-    },
+    refreshDashboard(): void { void DashboardPanel.current?.refresh(); void dashboardView.refresh(); },
+    setPhase(next): void { phase = next; this.refreshDashboard(); },
+    checkAnswer: text => explanation.checkAnswer(text),
   };
 
   // The persistent Activity-Bar sidebar dashboard (Build Order #2). It shares
   // the same state + handlers as the editor-tab panel, so both stay in sync.
   const dashboardView = new DashboardView(context.extensionUri, {
     getState: () => app.getDashboardState(),
-    onCommand: (command) => void vscode.commands.executeCommand(command),
+    onCommand: (command, ...args) => void vscode.commands.executeCommand(command, ...args),
     onAsk: (question) =>
       void vscode.commands.executeCommand('simpleecode.ask', question),
     onCancel: () => void vscode.commands.executeCommand('simpleecode.cancelPrompt'),
+    onExplanation: message => explanation.action(message),
     onOpenSource: (path, line) =>
       void vscode.commands.executeCommand('simpleecode.openSource', path, line),
     onOpenExternal: (url) => openExternalUrl(url),
@@ -234,7 +105,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(
       DashboardView.viewType,
       dashboardView,
-      { webviewOptions: { retainContextWhenHidden: true } },
+      { webviewOptions: { retainContextWhenHidden: false } },
     ),
   );
 
@@ -367,6 +238,10 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument(scheduleRefresh),
+    vscode.workspace.onDidChangeConfiguration(event => {
+      if (event.affectsConfiguration('simpleecode.privacy') || event.affectsConfiguration('simpleecode.retrieval') || event.affectsConfiguration('simpleecode.acp')) { explanation.coordinator.invalidate(); }
+    }),
     vscode.window.onDidChangeActiveTextEditor(scheduleRefresh),
     vscode.window.onDidChangeTextEditorSelection(scheduleRefresh),
     new vscode.Disposable(() => debounce && clearTimeout(debounce)),
@@ -375,6 +250,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   logger.info('SimpleeCode activated.');
+  // A test-host-only inspection boundary. Production activation exposes no API.
+  if (context.extensionMode === vscode.ExtensionMode.Test) {
+    return { getState: () => app.getDashboardState(), action: (message: import('./explanation/ExplanationService').ExplanationAction) => explanation.action(message) };
+  }
+  return undefined;
 }
 
 export async function deactivate(): Promise<void> {

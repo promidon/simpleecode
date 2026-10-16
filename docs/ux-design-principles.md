@@ -44,7 +44,7 @@ principle:
 Ground the interaction-cost and IA audits in SimpleeCode's three critical flows:
 
 1. **Explain** - the developer selects code or a file; SimpleeCode returns a
-   grounded explanation at the chosen depth, with facts, citations, and context
+   grounded explanation for the chosen goal and optional guidance, with facts, citations, and context
    gaps visible.
 2. **Tour** - SimpleeCode walks the workspace in a deterministic order so the
    developer can understand the codebase without already knowing where to look.
@@ -199,6 +199,18 @@ lands.
 - Are targets, focus management, and error states handled consistently across
   panel and sidebar?
 
+## Prepared explanation behavior
+
+Right-click Explain captures code and opens the sidebar without sending. The
+person chooses Understand, Connections, or Investigate, optionally describes how
+to explain, and explicitly sends. The prompt inspector is an optional in-view
+detail before and after sending. Explicitly enabled extra review stays inline.
+Never use a native modal for prompt review. One scrollable surface keeps actions
+reachable at small heights and large zoom. Preserve focus, caret, reading
+position, draft text and each answer's own source/goal across state updates.
+Guidance is session-only until explicitly saved as a local personal default.
+Use universal readable prose; never assign a diagnosis to the reader.
+
 ## Visibility of system status
 
 **Source:** Nielsen Heuristic #1 (NNGroup), Tognazzini - Latency Reduction.
@@ -260,7 +272,7 @@ extension follows VS Code conventions where developers expect them.
 
 Users should not have to wonder whether different words or actions mean the
 same thing. This covers internal consistency (Explain, Tour, and Check agree on
-citations, badges, file chips, statuses, and depth controls) and external
+citations, badges, file chips, statuses, and goal and guidance controls) and external
 consistency (VS Code command titles, Activity-Bar behavior, focus rings,
 settings names, and theme behavior). Low-chrome is itself a standard: do not
 reintroduce a one-off card stack or decorative box language in a single corner.
@@ -320,7 +332,7 @@ undiscoverable gestures.
 
 **Audit questions**
 
-- Are Explain, Tour, Check, Stop, New, depth, Preview, and Send visible or
+- Are Explain, Tour, Check, Stop, New explanation, goals, inspection, and Explain visible or
   discoverable at the point of use?
 - Does the interface surface context - file, line range, parent symbol, scope,
   and available facts - to reduce memory burden?
@@ -335,19 +347,19 @@ undiscoverable gestures.
 Flexibility.
 
 **Definition:** SimpleeCode's guided surfaces serve the first-time and unsure
-developer; command palette entries, keyboard access, depth modes, reuse of the
+developer; command palette entries, keyboard access, goal choices, reuse of the
 current packet, and verification tools let power users move fast without
 cluttering the calm view.
 
 The interface must serve novice and expert alike. Shortcuts, command palette
-entries, segmented depth modes, repeatable checks, and one-click source links
+entries, segmented goal choices, repeatable checks, and one-click source links
 accelerate experienced users without adding chrome for first-timers. Optimize
 for the developer's time, not the system's.
 
 **Audit questions**
 
 - Are high-frequency actions reachable by keyboard and command palette?
-- Can a fluent developer re-run at a different depth, verify a claim, or open a
+- Can a fluent developer prepare a different goal, verify a claim, or open a
   cited file without rebuilding context manually?
 - Are batch or repeated operations available where users routinely act on many
   items, such as touring files or checking multiple claims?
@@ -367,7 +379,7 @@ signature risk: a calm, low-chrome surface can strip the signifiers that tell
 the developer what is clickable. Flat does not mean featureless - hover, focus,
 press, selected, loading, and disabled states must read clearly. What looks like
 a button behaves like one; what is static does not pretend to be interactive.
-Controls map to their effects: depth controls affect the answer, Send belongs
+Controls map to their effects: goal and guidance controls affect the answer, Send belongs
 to the ask box, Tour navigation belongs near the current tour step, and claim
 links belong on the claims they open.
 

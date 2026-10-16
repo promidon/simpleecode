@@ -16,7 +16,7 @@ export interface PrivacyConfig {
 
 export const DEFAULT_PRIVACY_CONFIG: PrivacyConfig = {
   defaultScope: 'current_file',
-  showPromptBeforeSending: true,
+  showPromptBeforeSending: false,
   maxFileBytes: 200_000,
   redactSecrets: true,
   blockedFileGlobs: [
@@ -47,6 +47,12 @@ interface GuardResult {
 
 const TRUNCATION_MARKER =
   '\n\n/* … SimpleeCode truncated the rest of this file (size guard) … */\n';
+
+/** Count retained source lines only, never the synthetic size-guard marker. */
+export function retainedLineCount(text: string): number {
+  const retained = text.split(TRUNCATION_MARKER)[0];
+  return retained ? retained.split('\n').length : 0;
+}
 
 /**
  * Apply path blocking, size truncation and secret redaction to a chunk of code.

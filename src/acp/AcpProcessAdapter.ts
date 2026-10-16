@@ -2,13 +2,13 @@ import * as vscode from 'vscode';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { accessSync, constants } from 'fs';
 import { delimiter, isAbsolute, join } from 'path';
+import { createInterface } from 'readline';
 import {
   type AcpAvailability,
   type AcpSendResult,
   type AcpTransportAdapter,
 } from './AcpChatAdapter';
 import {
-  LineDecoder,
   type AcpMessage,
   agentTextFromUpdate,
   cancelNotification,
@@ -16,6 +16,7 @@ import {
   errorResponse,
   initializeRequest,
   newSessionRequest,
+  parseMessage,
   promptRequest,
   rejectPermissionResult,
   resultResponse,
@@ -49,11 +50,12 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
   private nextId = 1;
   private readonly pending = new Map<
     number,
-    { resolve: (msg: AcpMessage) => void; timer: NodeJS.Timeout }
+    { resolve: (msg: AcpMessage) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }
   >();
   private onAgentText: ((chunk: string) => void) | undefined;
   /** Id of the `session/prompt` request awaiting an answer, so cancel can end it. */
   private inflightPromptId: number | undefined;
+  private generation = 0;
 
   constructor(
     private readonly logger: Logger,
@@ -64,11 +66,13 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
     prompt: string,
     onChunk?: (textSoFar: string) => void,
   ): Promise<AcpSendResult> {
+    const generation = this.generation;
     try {
       await this.ensureSession();
+      if (generation !== this.generation) { throw new Error('Retired request'); }
     } catch (err) {
       this.logger.error('ACP agent failed to start.', safeError(err));
-      this.stop();
+      if (generation === this.generation) { this.stop(); }
       return {
         delivery: 'failed',
         detail:
@@ -106,14 +110,16 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
       };
     } catch (err) {
       this.logger.error('ACP prompt failed.', safeError(err));
-      this.stop();
+      if (generation === this.generation) { this.stop(); }
       return {
         delivery: 'failed',
         detail: 'ACP prompt failed. Check the SimpleeCode output for a redacted diagnostic.',
       };
     } finally {
-      this.onAgentText = undefined;
-      this.inflightPromptId = undefined;
+      if (generation === this.generation) {
+        this.onAgentText = undefined;
+        this.inflightPromptId = undefined;
+      }
     }
   }
 
@@ -150,10 +156,7 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
    */
   newConversation(): void {
     this.cancel();
-    if (this.sessionId) {
-      this.logger.info('ACP agent: starting a new conversation (session reset).');
-    }
-    this.sessionId = undefined;
+    this.stop();
   }
 
   async isAvailable(): Promise<boolean> {
@@ -179,11 +182,15 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
 
   /** Kill the agent process (used on extension deactivation). */
   stop(): void {
+    this.generation++;
     for (const [, entry] of this.pending) {
       clearTimeout(entry.timer);
+      entry.reject(new Error('ACP process stopped'));
     }
     this.pending.clear();
     this.sessionId = undefined;
+    this.onAgentText = undefined;
+    this.inflightPromptId = undefined;
     if (this.child) {
       this.child.kill();
       this.child = undefined;
@@ -193,13 +200,14 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
   // --- process + session lifecycle -------------------------------------------
 
   private async ensureSession(): Promise<void> {
+    const generation = this.generation;
     if (this.child && this.child.exitCode === null && this.sessionId) {
       return;
     }
-    this.stop();
     const { command, args, environmentVariables } = readAgentConfig();
     const cwd = this.isolatedCwd;
     await vscode.workspace.fs.createDirectory(vscode.Uri.file(cwd));
+    if (generation !== this.generation) { throw new Error('Cancelled during startup'); }
 
     this.logger.info(`ACP agent: starting "${command}" in an isolated working directory.`);
     const child = spawn(command, args, {
@@ -208,26 +216,32 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
     });
     this.child = child;
 
-    const decoder = new LineDecoder();
-    child.stdout.on('data', (data: Buffer) => {
-      for (const message of decoder.push(data.toString('utf8'))) {
+    // readline decodes UTF-8 across chunk boundaries; stray non-JSON lines are skipped.
+    createInterface({ input: child.stdout }).on('line', (line) => {
+      if (this.child !== child) { return; }
+      const message = parseMessage(line);
+      if (message) {
         this.onMessage(message);
       }
     });
     child.stderr.on('data', (data: Buffer) => {
+      if (this.child !== child) { return; }
       const safe = redactSecrets(data.toString('utf8').trim()).text;
       this.logger.warn('ACP agent stderr (secret-redacted):', safe);
     });
     child.on('exit', (code) => {
+      if (this.child !== child) { return; }
       this.logger.warn(`ACP agent exited (code ${code}).`);
       this.stop();
     });
     child.on('error', (err) => {
+      if (this.child !== child) { return; }
       this.logger.error('ACP agent spawn error:', String(err));
       this.stop();
     });
 
     const init = await this.request((id) => initializeRequest(id), INIT_TIMEOUT_MS);
+    if (generation !== this.generation) { throw new Error('Cancelled during initialization'); }
     if (init.error) {
       throw new Error(`initialize failed: ${init.error.message}`);
     }
@@ -235,6 +249,7 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
       (id) => newSessionRequest(id, cwd),
       INIT_TIMEOUT_MS,
     );
+    if (generation !== this.generation) { throw new Error('Cancelled during session creation'); }
     if (session.error) {
       throw new Error(`session/new failed: ${session.error.message}`);
     }
@@ -263,7 +278,7 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
         this.pending.delete(id);
         reject(new Error(`timed out after ${timeoutMs / 1000}s`));
       }, timeoutMs);
-      this.pending.set(id, { resolve, timer });
+      this.pending.set(id, { resolve, reject, timer });
       child.stdin.write(encodeMessage(build(id)));
     });
   }
@@ -282,6 +297,7 @@ export class AcpProcessAdapter implements AcpTransportAdapter {
 
     // Notification: streamed session updates.
     if (message.method === 'session/update') {
+      if ((message.params as { sessionId?: string })?.sessionId !== this.sessionId) { return; }
       const text = agentTextFromUpdate(message.params);
       if (text) {
         this.onAgentText?.(text);

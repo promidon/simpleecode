@@ -1,10 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import {
-  LineDecoder,
   agentTextFromUpdate,
   cancelNotification,
-  encodeMessage,
   initializeRequest,
   newSessionRequest,
   parseMessage,
@@ -12,26 +10,6 @@ import {
   rejectPermissionResult,
   stopReasonOf,
 } from '../acp/acpProtocol';
-
-test('LineDecoder yields messages split across chunks', () => {
-  const decoder = new LineDecoder();
-  const msg = { jsonrpc: '2.0' as const, id: 1, result: { ok: true } };
-  const wire = encodeMessage(msg);
-  const first = decoder.push(wire.slice(0, 10));
-  assert.equal(first.length, 0);
-  const second = decoder.push(wire.slice(10));
-  assert.equal(second.length, 1);
-  assert.deepEqual(second[0], msg);
-});
-
-test('LineDecoder handles several messages in one chunk and skips noise', () => {
-  const decoder = new LineDecoder();
-  const a = encodeMessage({ jsonrpc: '2.0', id: 1, result: {} });
-  const b = encodeMessage({ jsonrpc: '2.0', method: 'session/update', params: {} });
-  const messages = decoder.push(`${a}some stray log line\n${b}`);
-  assert.equal(messages.length, 2);
-  assert.equal(messages[1].method, 'session/update');
-});
 
 test('parseMessage rejects non-JSON-RPC lines', () => {
   assert.equal(parseMessage('not json'), undefined);

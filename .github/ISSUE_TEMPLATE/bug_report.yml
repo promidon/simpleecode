@@ -30,6 +30,12 @@ body:
     validations:
       required: true
 
+  - type: textarea
+    id: explanation-flow
+    attributes:
+      label: Goal, surface, and context (optional)
+      description: Which goal? Sidebar or editor panel? Any missing-context notice? For layout issues, include window size and zoom. Do not paste private prompts.
+
   - type: input
     id: versions
     attributes:

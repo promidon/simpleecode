@@ -1,135 +1,23 @@
-import {
-  type ContextPacket,
-  type ExplanationTask,
-  type PrivacyScope,
-  defaultUserPrompt,
-} from './ContextPacket';
-import { getActiveEditorSnapshot } from './ActiveEditorContext';
-import { getSelectionSnapshot } from './SelectionContext';
-import { applyGuards, type PrivacyConfig } from '../privacy/privacyGuard';
-import { effectivePrivacyScope } from '../privacy/privacyScope';
+import { defaultUserPrompt, type ContextPacket } from './ContextPacket';
+import { applyGuards, retainedLineCount, type PrivacyConfig } from '../privacy/privacyGuard';
+import { goalScope, type ExplanationDraft } from '../explanation/model';
 
-interface PacketBuildResult {
-  packet?: ContextPacket;
-  /** Set when the privacy guard refused the file. */
-  blocked?: string;
-  /** Set when a packet can't be built (e.g. no editor / no selection). */
-  error?: string;
-}
-
-/**
- * Assemble a privacy-checked `ContextPacket` for the given task from the active
- * editor. Returns `{ error }` or `{ blocked }` instead of throwing so callers
- * can show a friendly message.
- */
-export function buildContextPacket(
-  task: ExplanationTask,
-  userPrompt: string | undefined,
-  config: PrivacyConfig,
-): PacketBuildResult {
-  const active = getActiveEditorSnapshot();
-  if (!active) {
-    return { error: 'No active editor. Open a file first.' };
-  }
-
-  const selection = getSelectionSnapshot();
-  const prompt = userPrompt?.trim() || defaultUserPrompt(task);
-  const guardedPrompt = applyGuards(undefined, prompt, config);
-  const promptRedactions = guardedPrompt.redactions.map(
-    (note) => `Question: ${note}`,
-  );
-  const privacyScope = effectivePrivacyScope(task, config.defaultScope);
-
-  if (task === 'explain_selection') {
-    if (!selection || !selection.hasSelection) {
-      return { error: 'Select some code first, then run Explain Selection.' };
-    }
-    const guard = applyGuards(active.filePath, selection.selectedText, config);
-    if (guard.blocked) {
-      return { blocked: guard.reason };
-    }
-    return {
-      packet: finalize({
-        task,
-        filePath: active.filePath,
-        languageId: active.languageId,
-        selectedText: guard.text,
-        startLine: selection.startLine,
-        endLine: selection.endLine,
-        userPrompt: guardedPrompt.text,
-        privacyScope,
-        truncated: guard.truncated || guardedPrompt.truncated,
-        redactions: [...guard.redactions, ...promptRedactions],
-      }),
-    };
-  }
-
-  // A configured selection-only maximum also caps broader commands. Require a
-  // real selection rather than silently widening the consent boundary.
-  const selectionCapped = privacyScope === 'selection_only';
-  if (selectionCapped && (!selection || !selection.hasSelection)) {
-    return {
-      error:
-        'Your privacy scope is Selection only. Select code first, or allow a broader scope in SimpleeCode privacy settings.',
-    };
-  }
-
-  const sourceText = selectionCapped ? selection!.selectedText : active.fullText;
-  const guard = applyGuards(active.filePath, sourceText, config);
-  if (guard.blocked) {
-    return { blocked: guard.reason };
-  }
-
-  const redactions = [...guard.redactions, ...promptRedactions];
-
+/** Pure capture-to-packet boundary. Never reads the editor after capture. */
+export function buildContextPacket(draft: ExplanationDraft, config: PrivacyConfig): ContextPacket {
+  const s = draft.source;
+  const scope = goalScope(draft.options.goal, s.focus, config.defaultScope);
+  if ((s.focus === 'selection' || scope === 'selection_only') && !s.selectedText) { throw new Error('Select code before explaining a selection.'); }
+  const selected = s.focus === 'selection' || scope === 'selection_only';
+  const guard = applyGuards(s.filePath, selected ? s.selectedText : s.fullText, config);
+  if (guard.blocked) { throw new Error('This source is blocked by privacy settings.'); }
+  const task = draft.options.goal === 'connections' ? 'explain_system_role' : selected ? 'explain_selection' : 'explain_file';
+  const question = applyGuards(undefined, draft.options.question.trim() || defaultUserPrompt(task), config);
   return {
-    packet: finalize({
-      task,
-      filePath: active.filePath,
-      languageId: active.languageId,
-      selectedText: selectionCapped ? guard.text : undefined,
-      fullText: selectionCapped ? undefined : guard.text,
-      startLine: selectionCapped ? selection!.startLine : 1,
-      endLine: selectionCapped ? selection!.endLine : active.lineCount,
-      userPrompt: guardedPrompt.text,
-      privacyScope,
-      truncated: guard.truncated || guardedPrompt.truncated,
-      redactions,
-    }),
-  };
-}
-
-interface FinalizeInput {
-  task: ExplanationTask;
-  filePath?: string;
-  languageId?: string;
-  selectedText?: string;
-  fullText?: string;
-  startLine?: number;
-  endLine?: number;
-  userPrompt: string;
-  privacyScope: PrivacyScope;
-  truncated: boolean;
-  redactions: string[];
-}
-
-function finalize(input: FinalizeInput): ContextPacket {
-  const code = input.selectedText ?? input.fullText ?? '';
-  return {
-    task: input.task,
-    filePath: input.filePath,
-    languageId: input.languageId,
-    selectedText: input.selectedText,
-    fullText: input.fullText,
-    startLine: input.startLine,
-    endLine: input.endLine,
-    userPrompt: input.userPrompt,
-    privacyScope: input.privacyScope,
-    meta: {
-      byteSize: Buffer.byteLength(code, 'utf8'),
-      truncated: input.truncated,
-      redactions: input.redactions,
-      createdAt: new Date().toISOString(),
-    },
+    task, filePath: s.filePath, languageId: s.languageId,
+    selectedText: selected ? guard.text : undefined, fullText: selected ? undefined : guard.text,
+    startLine: selected ? s.startLine : 1, endLine: (selected ? s.startLine : 1) + Math.max(0, retainedLineCount(guard.text) - 1),
+    userPrompt: question.text, privacyScope: scope,
+    meta: { byteSize: Buffer.byteLength(guard.text), truncated: guard.truncated || question.truncated,
+      redactions: [...guard.redactions, ...question.redactions], createdAt: new Date().toISOString() },
   };
 }

@@ -136,7 +136,7 @@
                 <div class="simplee-tabbar" aria-hidden="true"><span class="active">SIMPLEECODE</span><span>AGENT</span><span>CODEX</span><b>×</b></div>
                 <div class="simplee-toolbar">
                   <strong><span class="search-mark" aria-hidden="true">⌕</span> SimpleeCode</strong>
-                  <span class="index-status"><i></i> Indexed · ACP ready</span>
+                  <span class="index-status"><i></i> Indexed · AI agent ready</span>
                   <span class="simplee-tabs" role="tablist" aria-label="Product demonstrations">
                     <button type="button" role="tab" id="product-tab-tour" data-product-demo="tour" data-analytics-cta="demo_tour" data-analytics-placement="product" data-analytics-demo="tour" aria-controls="product-demo-tour" aria-selected="false">Tour</button>
                     <button type="button" role="tab" id="product-tab-explain" data-product-demo="explain" data-analytics-cta="demo_explain" data-analytics-placement="product" data-analytics-demo="explain" aria-controls="product-demo-explain" aria-selected="false">Explain</button>
@@ -163,7 +163,7 @@
                   <div class="product-demo-panel explain-panel" id="product-demo-explain" data-product-panel="explain" role="tabpanel" aria-labelledby="product-tab-explain" tabindex="0" hidden>
                     <div class="demo-panel-heading"><span aria-hidden="true">✦</span><div><strong>Explain selection</strong><small>extension.ts · lines 4–7</small></div></div>
                     <p>This function starts the extension. It builds the local code index first, then registers the commands that use it.</p>
-                    <div class="demo-facts"><span>activate() function</span><span>2 verified calls</span><span>Beginner mode</span></div>
+                    <div class="demo-facts"><span>activate() function</span><span>2 verified calls</span><span>Goal: Understand</span></div>
                     <span class="demo-source-link">Open the source <span aria-hidden="true">→</span></span>
                   </div>
 
@@ -222,7 +222,7 @@
             <div class="flow-copy">
               <span class="flow-number">02 / Explain</span>
               <h3>Explain the code in front of you</h3>
-              <p>Select a few lines, a function, or a whole file. Choose beginner, detailed, or debug mode.</p>
+              <p>Select a few lines, a function, or a whole file. Choose a goal—understand it, follow its connections, or investigate a problem—and optionally say how you want it explained, like “ELI5”.</p>
             </div>
             <div class="selection-demo" role="group" aria-label="Interactive TypeScript explanation example">
               <div class="selection-top"><span>payment-service.ts</span><span>TypeScript</span></div>
@@ -272,7 +272,7 @@
           <article>
             <span class="truth-step">02</span>
             <h3>AI writes the explanation</h3>
-            <p>The model receives the gathered facts and turns them into readable prose at the depth you selected.</p>
+            <p>The model receives the gathered facts and turns them into readable prose for the goal and guidance you chose.</p>
             <div class="answer-lines" aria-hidden="true"><i></i><i></i><i></i></div>
           </article>
           <span class="truth-arrow" aria-hidden="true">→</span>
@@ -290,7 +290,7 @@
         <div class="privacy-copy" data-reveal>
           <p class="eyebrow">Privacy you can inspect</p>
           <h2 id="privacy-title">See what will<br><em>be sent</em></h2>
-          <p>By default, SimpleeCode shows the complete prompt before sending it. Sensitive paths are blocked, secret-looking lines are removed, and you make the final decision.</p>
+          <p>Nothing is sent until you press Explain. The complete prompt is always inspectable in the sidebar, before and after sending. Sensitive paths are blocked, secret-looking lines are removed, and you make the final decision.</p>
           <p><strong>Website analytics are optional.</strong> If you allow them, limited page and interaction events go to Google Analytics. The site never sends source code, extension activity, filenames, form content, or free text. Consent and the visitor cookie expire after six months; GA4 event retention is two months.</p>
           <a class="text-link" href="https://github.com/promidon/simpleecode#privacy" data-analytics-cta="read_privacy_model" data-analytics-placement="privacy">Read the privacy model <span aria-hidden="true">→</span></a>
         </div>
@@ -309,7 +309,7 @@
         <div class="install-heading" data-reveal>
           <p class="eyebrow">Install it yourself</p>
           <h2 id="install-title">Keep control from the start</h2>
-          <p>SimpleeCode is distributed as a VSIX. The optional ACP agent streams answers into the dashboard; without it, SimpleeCode uses its clipboard fallback.</p>
+          <p>SimpleeCode is distributed as a VSIX. The optional ACP agent streams answers into the dashboard; without it, you can copy the prepared prompt into your own chat.</p>
           <div class="actions">
             <a class="button primary" href="/__SIMPLEECODE_VSIX__" download="__SIMPLEECODE_VSIX__" data-analytics-cta="download_vsix" data-analytics-placement="install">Download __SIMPLEECODE_VSIX__ <span aria-hidden="true">↓</span></a>
             <a class="button quiet" href="https://github.com/promidon/simpleecode/blob/main/CHANGELOG.md" data-analytics-cta="read_changelog" data-analytics-placement="install">Read the changelog <span aria-hidden="true">→</span></a>

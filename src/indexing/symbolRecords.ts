@@ -24,6 +24,8 @@ export interface SymbolRecord {
   signature?: string;
   /** The first lines of the symbol's own code. */
   codePreview: string;
+  /** In-memory document version used for this extraction, when available. */
+  version?: number;
 }
 
 /** Plain shape of `vscode.DocumentSymbol` (kind is the numeric SymbolKind). */

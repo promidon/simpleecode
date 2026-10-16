@@ -6,8 +6,7 @@ import { buildEdges, edgesTo } from '../indexing/graphEdges';
 import type { SymbolIndexReader, SymbolRecord } from '../indexing/SymbolIndex';
 import { resolveRelativeImport } from '../indexing/resolveImport';
 import type { Logger } from '../utils/logger';
-import { applyGuards, type PrivacyConfig } from '../privacy/privacyGuard';
-import { readPrivacyConfig } from '../privacy/PrivacySettings';
+import { applyGuards, retainedLineCount, type PrivacyConfig } from '../privacy/privacyGuard';
 import { referencedTypeNames } from './typeReferences';
 import { buildChunks, SparseVectorIndex } from './vectorSearch';
 import {
@@ -46,11 +45,11 @@ export class DeterministicRetriever implements Retriever {
     private readonly logger?: Logger,
   ) {}
 
-  async retrieve(packet: ContextPacket): Promise<RetrievedContext[]> {
+  async retrieve(packet: ContextPacket, config: PrivacyConfig, sparseSearchEnabled: boolean, index?: FileIndexReader): Promise<RetrievedContext[]> {
+    if (index) { return new DeterministicRetriever(index, this.symbolIndex, this.logger).retrieve(packet, config, sparseSearchEnabled); }
     if (!packet.filePath || !scopeIncludesRelatedFiles(packet.privacyScope)) {
       return [];
     }
-    const config = readPrivacyConfig();
     const record = this.fileIndex.get(packet.filePath);
     const out: RetrievedContext[] = [];
     const seen = new Set<string>([packet.filePath]);
@@ -122,9 +121,6 @@ export class DeterministicRetriever implements Retriever {
     // 3. Vector search (#17): when the user typed a real question, rank all
     //    symbol chunks + file summaries against it (sparse TF-IDF, local and
     //    deterministic) and bring the best matches along.
-    const sparseSearchEnabled = vscode.workspace
-      .getConfiguration('simpleecode.retrieval')
-      .get<boolean>('enableSparseSearch', false);
     for (const match of sparseSearchEnabled ? this.questionMatches(packet) : []) {
       if (seen.has(match.chunk.id) || seen.has(match.chunk.fileId)) {
         continue;
@@ -228,6 +224,8 @@ export class DeterministicRetriever implements Retriever {
     name: string,
     config: PrivacyConfig,
   ): RetrievedContext | undefined {
+    const open = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === decl.fileId);
+    if (open?.isDirty && open.version !== decl.version) { return undefined; }
     const guard = applyGuards(decl.fileId, decl.codePreview, config);
     if (guard.blocked) {
       this.logger?.info(`Retrieval: skipped ${decl.fileId} (privacy: ${guard.reason})`);
@@ -236,11 +234,12 @@ export class DeterministicRetriever implements Retriever {
     return {
       sourceType: 'file',
       path: this.fileIndex.get(decl.fileId)?.path ?? decl.fileId,
-      range: `${decl.range.startLine}-${decl.range.endLine}`,
+      range: `${decl.range.startLine}-${decl.range.startLine + Math.max(0, retainedLineCount(guard.text) - 1)} (declaration preview)`,
       reasonIncluded: `Declares ${name} (${decl.kind}), which this code uses`,
       content: guard.text,
       redactions: guard.redactions,
-      truncated: guard.truncated,
+      truncated: guard.truncated || retainedLineCount(guard.text) < decl.range.endLine - decl.range.startLine + 1,
+      version: decl.version,
     };
   }
 
@@ -260,8 +259,10 @@ export class DeterministicRetriever implements Retriever {
     config: PrivacyConfig,
   ): Promise<RetrievedContext | undefined> {
     try {
-      const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(absPath));
-      const guard = applyGuards(absPath, Buffer.from(bytes).toString('utf8'), config);
+      const open = vscode.workspace.textDocuments.find(doc => doc.uri.fsPath === absPath && !doc.isClosed);
+      const version = open?.version;
+      const text = open ? open.getText() : Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.file(absPath))).toString('utf8');
+      const guard = applyGuards(absPath, text, config);
       if (guard.blocked) {
         this.logger?.info(`Retrieval: skipped ${absPath} (privacy: ${guard.reason})`);
         return undefined;
@@ -269,19 +270,17 @@ export class DeterministicRetriever implements Retriever {
       const lines = guard.text.split('\n').slice(0, PREVIEW_LINES);
       const preview = lines.join('\n').slice(0, PREVIEW_CHARS);
       const record = this.fileIndex.get(absPath);
-      // Deterministic file summary (#16) leads the block so the reader gets
-      // orientation before the raw code.
-      const content = record?.summary
-        ? `Summary: ${record.summary}\n\n${preview}`
-        : preview;
+      // Never prefix a current source snapshot with a stale indexed summary.
+      const content = preview;
       return {
         sourceType,
         path: record?.path ?? absPath,
-        range: `1-${lines.length} (preview)`,
+        range: `1-${retainedLineCount(preview)} (preview)`,
         reasonIncluded,
         content,
         redactions: guard.redactions,
-        truncated: guard.truncated,
+        truncated: guard.truncated || preview.length < guard.text.length,
+        version,
       };
     } catch (err) {
       this.logger?.warn(`Retrieval: failed to read ${absPath}`, String(err));

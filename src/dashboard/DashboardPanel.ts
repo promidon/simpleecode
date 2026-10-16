@@ -4,7 +4,8 @@ import type { DocLink } from '../rag/swiftDocs';
 import type { VerifyResult } from '../rag/verifyAnswer';
 import type { CodeFacts } from '../context/codeFacts';
 import { dispatchDashboardMessage } from './dashboardMessages';
-import type { ExplanationMode } from '../prompt/promptBuilder';
+import type { ExplanationSession } from '../explanation/model';
+import type { ExplanationAction } from '../explanation/ExplanationService';
 
 export type DashboardPhase =
   | 'idle'
@@ -21,7 +22,7 @@ export type DashboardPhase =
 /** Serializable snapshot the webview renders. Built by `extension.ts`. */
 export interface DashboardState {
   phase: DashboardPhase;
-  explanationMode: ExplanationMode;
+  experience?: ExplanationSession & { savedGuidance: string; guidanceNotice: string; pendingGuidance?: string; sourceChanged: boolean };
   activeFile?: string;
   languageId?: string;
   selection?: {
@@ -37,6 +38,8 @@ export interface DashboardState {
     available: boolean;
     detail: string;
   };
+  /** In-extension feedback needs a per-user token; otherwise offer GitHub Issues. */
+  feedbackConfigured: boolean;
   lastPacket?: {
     task: string;
     privacyScope: string;
@@ -86,12 +89,12 @@ export interface DashboardState {
   docs?: DocLink[];
   /** Verified facts from the language server (Facts Layer, Slice 1/2). */
   facts?: CodeFacts;
-  nextSteps: string[];
 }
 
 export interface DashboardHandlers {
+  onExplanation(message: ExplanationAction): Promise<void>;
   getState(): Promise<DashboardState>;
-  onCommand(command: string): void;
+  onCommand(command: string, ...args: unknown[]): void;
   /** A free-text question typed into the dashboard's ask box. */
   onAsk(question: string): void;
   /** Stop the prompt currently streaming into the dashboard (#2). */
@@ -137,7 +140,7 @@ export class DashboardPanel {
       column ?? vscode.ViewColumn.Beside,
       {
         enableScripts: true,
-        retainContextWhenHidden: true,
+        retainContextWhenHidden: false,
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')],
       },
     );
@@ -168,6 +171,12 @@ export class DashboardPanel {
   }
 
   /** Re-pull state and push it to the webview. Safe to call any time. */
+  static revealCurrent(): boolean {
+    if (!DashboardPanel.current) { return false; }
+    DashboardPanel.current.panel.reveal(undefined, false);
+    return true;
+  }
+
   async refresh(): Promise<void> {
     if (!DashboardPanel.current) {
       return;

@@ -18,28 +18,6 @@ export interface AcpMessage {
 
 const ACP_PROTOCOL_VERSION = 1;
 
-/**
- * Accumulates raw stdout chunks and yields complete newline-delimited JSON
- * messages. Malformed lines are skipped (an agent may print stray text).
- */
-export class LineDecoder {
-  private buffer = '';
-
-  push(chunk: string): AcpMessage[] {
-    this.buffer += chunk;
-    const lines = this.buffer.split('\n');
-    this.buffer = lines.pop() ?? '';
-    const messages: AcpMessage[] = [];
-    for (const line of lines) {
-      const message = parseMessage(line);
-      if (message) {
-        messages.push(message);
-      }
-    }
-    return messages;
-  }
-}
-
 export function parseMessage(line: string): AcpMessage | undefined {
   const trimmed = line.trim();
   if (!trimmed.startsWith('{')) {

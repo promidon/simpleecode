@@ -19,15 +19,23 @@ So you know what you're building on:
 Deterministic file index • symbol index • module graph with persisted edges •
 deterministic file summaries • sparse TF-IDF search (off by default) • verified
 facts layer (LSP + self-parsing floor) • structured prompt packets • privacy
-guard and full pre-send review • streamed ACP answers • answer checked back
+guard and optional inline prompt inspection • streamed ACP answers • answer checked back
 against the facts • click-through file:line links • codebase tour •
 Swift/Apple doc links.
 
 ---
 
+## 0.2.0 candidate — explanation experience
+
+Goal-driven Understand / Connections / Investigate, optional saved guidance,
+immutable source capture, explicit send, inline inspection, and snapshot-owned
+follow-ups are implemented in this candidate. Manual accessibility, first-time
+usability, actual AI answer quality, and distribution gates remain separate.
+See [acceptance](docs/explanation-acceptance.md).
+
 ## Next up
 
-The two things that most need doing.
+Hybrid retrieval remains a separate workstream.
 
 ### Hybrid retrieval — rank and dedupe across stages
 
@@ -51,13 +59,13 @@ why this hasn't bitten yet.
 
 ### "What's missing" warnings 🟢
 
-**Status: the one open item in the quality-checks work.**
+**Status: implemented for captured-context limits and omissions.**
 
 When the context is thin, say so *before* the answer — a symbol that wouldn't
 resolve, a file that got truncated, a dependency outside the privacy scope. A
 thin answer should be labeled thin, up front, rather than reading as confident.
 
-Everything else in the guardrail set is done: the "Inferred:" rule, required
+Existing guardrails include: the "Inferred:" rule, required
 file:line citations, invented-claim flagging, retrieved-source display, the
 context-packet debug view, and failed-retrieval logging.
 

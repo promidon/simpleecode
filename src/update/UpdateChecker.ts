@@ -50,7 +50,7 @@ export class UpdateChecker {
 
     if (!source) {
       const note =
-        'SimpleeCode updates: no source configured. Point simpleecode.updates.source at your SimpleeCode repo’s package.json (path or URL).';
+        'SimpleeCode updates: no update feed configured. Set simpleecode.updates.source to the HTTPS latest.json URL.';
       this.logger.info(note);
       if (verbose) {
         vscode.window.showInformationMessage(note);
@@ -141,9 +141,7 @@ export class UpdateChecker {
       const terminal = vscode.window.createTerminal({ name: 'SimpleeCode: update' });
       terminal.show();
       terminal.sendText(command);
-      vscode.window.showInformationMessage(
-        'SimpleeCode: update running in the terminal. Reload the window when it finishes.',
-      );
+      await offerReload('SimpleeCode: update running in the terminal. Reload the window when it finishes.');
       return;
     }
 
@@ -169,7 +167,7 @@ export class UpdateChecker {
     );
   }
 
-  /** Download the release .vsix and install it with the `code` CLI. */
+  /** Download the release .vsix and install it into this editor. */
   private async installVsix(
     url: string,
     expectedSha256: string,
@@ -206,11 +204,20 @@ export class UpdateChecker {
       return;
     }
 
-    const terminal = vscode.window.createTerminal({ name: 'SimpleeCode: update' });
-    terminal.show();
-    terminal.sendText(`code --install-extension "${target.fsPath}" --force`);
-    vscode.window.showInformationMessage(
-      'SimpleeCode: installing the update in the terminal. If "code" is not found, run "Shell Command: Install \'code\' command in PATH" from the Command Palette, then retry. Reload the window when it finishes.',
-    );
+    try {
+      // Installs into the running editor, not whichever `code` CLI is on PATH.
+      await vscode.commands.executeCommand('workbench.extensions.installExtension', target);
+    } catch (err) {
+      this.logger.warn('SimpleeCode updates: install failed', String(err));
+      vscode.window.showErrorMessage('SimpleeCode: the verified update could not be installed.');
+      return;
+    }
+    await offerReload('SimpleeCode: update installed. Reload the window to start using it.');
+  }
+}
+
+async function offerReload(message: string): Promise<void> {
+  if (await vscode.window.showInformationMessage(message, 'Reload window') === 'Reload window') {
+    await vscode.commands.executeCommand('workbench.action.reloadWindow');
   }
 }

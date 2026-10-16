@@ -3,6 +3,7 @@ import {
   copyFileSync,
   cpSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -66,6 +67,13 @@ cpSync(resolve(root, 'media', 'fonts'), resolve(publish, 'assets', 'fonts'), {
   recursive: true,
 });
 copyFileSync(vsixSource, resolve(publish, vsixName));
+// Earlier released VSIXs (downloaded and checksum-verified by release.sh) keep their URLs.
+const previousDir = process.env.SIMPLEECODE_PREVIOUS_VSIX_DIR;
+for (const name of previousDir ? readdirSync(previousDir) : []) {
+  if (/^simpleecode-\d+\.\d+\.\d+\.vsix$/.test(name) && name !== vsixName) {
+    copyFileSync(resolve(previousDir, name), resolve(publish, name));
+  }
+}
 
 for (const htmlFile of ['index.html', '404.html']) {
   const htmlPath = resolve(publish, htmlFile);

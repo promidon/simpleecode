@@ -22,12 +22,11 @@
     overflowBtn: document.getElementById('overflow-btn'),
     overflowMenu: document.getElementById('overflow-menu'),
     answerLive: document.getElementById('answer-live'),
-    segs: Array.from(document.querySelectorAll('.seg')),
   };
 
   const savedUi = vscode.getState() || {};
   let lastState = null;
-  let activeTab = savedUi.tab || 'tour';
+  let activeTab = savedUi.tab || 'explain';
 
   // --- Tabs -----------------------------------------------------------------
   function selectTab(tab, focus) {
@@ -92,6 +91,11 @@
       }
     }
   });
+  els.overflowMenu.addEventListener('focusout', (e) => {
+    if (!els.overflowMenu.contains(e.relatedTarget) && e.relatedTarget !== els.overflowBtn) {
+      closeMenu();
+    }
+  });
   els.overflowMenu.addEventListener('keydown', (e) => {
     const items = Array.from(els.overflowMenu.querySelectorAll('[role="menuitem"]'));
     const current = items.indexOf(document.activeElement);
@@ -116,13 +120,13 @@
       closeModal();
       return;
     }
-    // Arrow keys step the tour — but not while focus is on a tab (which uses
-    // arrows to move between tabs) or inside a text field.
+    // Arrow keys step the tour only while focus is inside the Tour panel, so
+    // menus, dialogs, tabs and text fields keep their own arrow behaviour.
     if (activeTab !== 'tour' || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) {
       return;
     }
     const el = e.target;
-    if (el && (el.closest('.tab') || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+    if (!el || !el.closest || !el.closest('#panel-tour') || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
       return;
     }
     e.preventDefault();
@@ -132,31 +136,13 @@
     });
   });
 
-  // --- Depth toggle (reflect the chosen depth; command re-runs the explain) -
-  els.segs.forEach((seg) => {
-    seg.addEventListener('click', () => {
-      els.segs.forEach((s) => {
-        const active = s === seg;
-        s.classList.toggle('is-active', active);
-        s.setAttribute('aria-pressed', active ? 'true' : 'false');
-      });
-    });
-  });
-
   function activeDepth(state) {
-    const mode = (state && state.explanationMode) || 'detailed';
-    return mode.charAt(0).toUpperCase() + mode.slice(1);
+    return state.answerGoal || 'Captured code';
   }
-
-  function renderDepth(state) {
-    const mode = (state && state.explanationMode) || 'detailed';
-    els.segs.forEach((seg) => {
-      const active = seg.dataset.mode === mode;
-      seg.classList.toggle('is-active', active);
-      seg.setAttribute('aria-pressed', active ? 'true' : 'false');
-    });
-  }
-
+  const explanationView = window.createExplanationView(vscode, selectTab, (turn, state) =>
+    turn.status === 'handed-off' ? '<p>No answer was captured or checked here. Continue in the external chat.</p>' :
+    answerBlock({ text: turn.text, html: turn.html, done: !['sending', 'streaming'].includes(turn.status), verify: turn.verify },
+      { ...state, answerGoal: turn.goalLabel }));
   // --- Ask box --------------------------------------------------------------
   const askForm = document.getElementById('ask');
   const askInput = document.getElementById('ask-input');
@@ -186,6 +172,7 @@
         return;
       }
       els.checkResults.innerHTML = '<p class="muted">Checking…</p>';
+      announce('Checking claims.');
       vscode.postMessage({ type: 'checkAnswer', text });
     });
   }
@@ -206,9 +193,10 @@
 
   function persist() {
     vscode.setState({
+      explanationPresentation: vscode.getState()?.explanationPresentation,
       tab: activeTab,
-      askText: askInput ? askInput.value : '',
-      checkText: checkInput ? checkInput.value : '',
+
+      // Code, prompts, answers, and pasted checks remain in memory only.
     });
   }
 
@@ -227,8 +215,12 @@
       return;
     }
     if (event.target.closest('[data-feedback]')) {
-      closeMenu();
-      openFeedback();
+      closeMenu(true);
+      if (lastState && lastState.feedbackConfigured) {
+        openFeedback();
+      } else {
+        vscode.postMessage({ type: 'openExternal', url: 'https://github.com/promidon/simpleecode/issues/new/choose' });
+      }
       return;
     }
     const link = event.target.closest('a[data-url]');
@@ -248,17 +240,10 @@
       });
       return;
     }
-    const cancelBtn = event.target.closest('[data-action="cancel"]');
-    if (cancelBtn) {
-      cancelBtn.textContent = 'Stopping…';
-      cancelBtn.disabled = true;
-      vscode.postMessage({ type: 'cancelPrompt' });
-      return;
-    }
     const cmdBtn = event.target.closest('[data-command]');
     if (cmdBtn && !cmdBtn.disabled) {
       if (cmdBtn.closest('.menu')) {
-        closeMenu();
+        closeMenu(true);
       }
       vscode.postMessage({ type: 'runCommand', command: cmdBtn.dataset.command });
       return;
@@ -271,15 +256,19 @@
 
   // --- Render ---------------------------------------------------------------
   function render(state) {
-    renderDepth(state);
+
     renderStatus(state);
     renderContextBar(state);
-    els.explain.innerHTML = explainContent(state);
-    els.facts.innerHTML = factsRail(state);
+    const feedbackItem = els.overflowMenu.querySelector('[data-feedback]');
+    if (feedbackItem) {
+      feedbackItem.textContent = state.feedbackConfigured ? 'Send feedback' : 'Report an issue ↗';
+    }
+    explanationView.render(state);
+    updateHtml(els.facts, factsRail(state));
     rememberFactsFold();
-    els.tour.innerHTML = tourContent(state);
+    updateHtml(els.tour, tourContent(state));
     if (els.checkAnswer) {
-      els.checkAnswer.innerHTML = answerWindow(state, '');
+      updateHtml(els.checkAnswer, answerWindow(state, ''));
     }
     renderLive(state);
     selectTab(activeTab, false);
@@ -314,22 +303,28 @@
     } else if (phase === 'reviewing') {
       text = 'Waiting for prompt review.';
     } else if (phase === 'sending') {
-      text = 'Sending the reviewed prompt.';
+      text = 'Sending the prepared prompt.';
     } else if (phase === 'streaming' || (a && !a.done)) {
       text = 'Claude is answering…';
     } else if (phase === 'verifying') {
       text = 'Checking answer claims against local facts.';
+    } else if (phase === 'failed') {
+      text = 'The last SimpleeCode operation failed. Any partial answer is incomplete.';
+    } else if (phase === 'cancelled') {
+      text = 'Stopped. Any partial answer is incomplete.';
+    } else if (state.experience?.turns.at(-1)?.status === 'handed-off') {
+      text = 'External handoff. No answer was captured or checked here.';
     } else if (a && a.done) {
       const v = a.verify;
       text = v
         ? `Answer ready. Limited check: ${v.grounded} grounded, ${v.unverified} unverified. Unrecognized prose remains unchecked.`
         : 'Answer ready.';
-    } else if (phase === 'failed') {
-      text = 'The last SimpleeCode operation failed.';
-    } else if (phase === 'cancelled') {
-      text = 'The last SimpleeCode operation was cancelled.';
     }
-    if (els.answerLive.textContent !== text) {
+    announce(text);
+  }
+
+  function announce(text) {
+    if (els.answerLive && els.answerLive.textContent !== text) {
       els.answerLive.textContent = text;
     }
   }
@@ -355,24 +350,29 @@
       cls += phase === 'failed' || phase === 'cancelled' ? ' is-warn' : ' is-ready';
     } else if (files > 0 && acpOk) {
       cls += ' is-ready';
-      text = 'Indexed · ACP ready';
+      text = 'Indexed · AI agent ready';
     } else if (files > 0) {
       cls += ' is-warn';
-      text = 'Indexed · ACP unavailable';
+      text = 'Indexed · AI agent unavailable';
     } else if (acpOk) {
       cls += ' is-warn';
-      text = 'ACP ready · not indexed';
+      text = 'AI agent ready · not indexed';
     } else {
       cls += ' is-warn';
       text = 'Not indexed';
     }
-    els.statusPill.className = cls;
-    els.statusPill.textContent = text;
+    // role="status" re-announces on every write, so only write real changes.
+    if (els.statusPill.className !== cls) {
+      els.statusPill.className = cls;
+    }
+    if (els.statusPill.textContent !== text) {
+      els.statusPill.textContent = text;
+    }
   }
 
   function renderContextBar(state) {
     if (!state.activeFile) {
-      els.contextBar.innerHTML = '<span class="muted">No editor — open a file to explain it.</span>';
+      updateHtml(els.contextBar, '<span class="muted">No editor — open a file to explain it.</span>');
       return;
     }
     const sel = state.selection;
@@ -383,17 +383,8 @@
     } else {
       loc = '<span class="muted">whole file (no selection)</span>';
     }
-    els.contextBar.innerHTML =
-      `<span class="file-chip">${esc(state.activeFile)}</span>${loc}` +
-      '<button class="preview-btn" id="preview-btn" data-preview>' +
-      `<span class="preview-ico" aria-hidden="true">${shieldSvg}</span>Review last prompt</button>`;
+    updateHtml(els.contextBar, `<span class="file-chip">${esc(state.activeFile)}</span>${loc}`);
   }
-
-  const shieldSvg =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-    '<path d="M12 3l7 3v5c0 4.4-3 8-7 10-4-2-7-5.6-7-10V6l7-3z" stroke="currentColor" stroke-width="1.6" ' +
-    'stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" ' +
-    'stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   // --- Modals (review + feedback share #modal-root) ------------------------
   let lastFocused = null;
@@ -417,6 +408,13 @@
     if (root.hidden) {
       return;
     }
+    if (modalKind === 'feedback') {
+      const title = root.querySelector('#fb-title');
+      const body = root.querySelector('#fb-message');
+      if (title && body) {
+        pendingFeedback = { title: title.value, body: body.value };
+      }
+    }
     root.hidden = true;
     root.innerHTML = '';
     modalKind = null;
@@ -425,17 +423,9 @@
     }
   }
 
-  function openReview() {
-    openModal('review', reviewModalHtml(lastState && lastState.lastPacket));
-    const root = document.getElementById('modal-root');
-    const closeBtn = root.querySelector('[data-modal-close]');
-    if (closeBtn) {
-      closeBtn.focus();
-    }
-  }
+  function openReview() { explanationView.inspectPrepared(); }
 
   function openFeedback() {
-    pendingFeedback = { title: '', body: '' };
     openModal('feedback', feedbackModalHtml('', pendingFeedback));
   }
 
@@ -495,6 +485,7 @@
     }
     const root = document.getElementById('modal-root');
     if (result && result.ok) {
+      pendingFeedback = { title: '', body: '' };
       root.innerHTML = feedbackModalHtml(
         '<div class="fb-banner is-ok" role="status">Thank you — that’s really helpful. Sent!</div>',
         { title: '', body: '' },
@@ -512,61 +503,13 @@
     }
   }
 
-  function reviewModalHtml(p) {
-    let inner;
-    if (!p) {
-      inner =
-        '<p class="muted">Nothing has been sent yet. Run an Explain and this will show ' +
-        'exactly what left your machine — the task, scope, file, size, and full prompt.</p>';
-    } else {
-      const rows = [
-        ['Task', esc(p.task)],
-        ['Privacy scope', esc(p.privacyScope)],
-        ['File', p.filePath ? esc(p.filePath) : '—'],
-        ['Size', p.byteSize != null ? `${p.byteSize} bytes${p.truncated ? ' (truncated)' : ''}` : '—'],
-      ];
-      if (p.delivery) {
-        rows.push(['Status', esc(p.delivery)]);
-      }
-      if (p.channel) {
-        rows.push(['Delivery', esc(p.channel)]);
-      }
-      const included = (p.includedSources || []).length
-        ? '<p class="modal-preview-label">Included sources</p><ul>' +
-          p.includedSources.map((source) => `<li><code>${esc(source)}</code></li>`).join('') +
-          '</ul>'
-        : '';
-      const redactionBanner = (p.redactions && p.redactions.length)
-        ? `<div class="redaction-banner">✓ ${p.redactions.map(esc).join(' · ')}</div>`
-        : '<div class="redaction-banner is-clear">No secrets detected — nothing redacted.</div>';
-      inner =
-        `<dl class="modal-facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>` +
-        included +
-        redactionBanner +
-        '<p class="modal-preview-label">Prompt preview</p>' +
-        `<pre class="modal-preview">${esc(p.promptPreview)}</pre>`;
-    }
-    return (
-      '<div class="modal-backdrop" data-modal-close></div>' +
-      '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
-      '<div class="modal-head">' +
-      `<span class="modal-shield" aria-hidden="true">${shieldSvg}</span>` +
-      '<div><h2 id="modal-title" class="modal-title">Last reviewed prompt</h2>' +
-      '<p class="modal-sub">This is the complete prompt from the most recent review gate.</p></div>' +
-      '<button class="icon-btn modal-x" data-modal-close aria-label="Close">✕</button>' +
-      '</div>' +
-      `<div class="modal-body">${inner}</div>` +
-      '</div>'
-    );
-  }
-
   // Keep Tab focus inside an open modal (WCAG 2.4.3 / 2.4.11).
   function trapFocus(e) {
     const root = document.getElementById('modal-root');
     if (root.hidden || e.key !== 'Tab') {
       return;
     }
-    const f = root.querySelectorAll('button, a[href], [tabindex]:not([tabindex="-1"])');
+    const f = root.querySelectorAll('button:not([disabled]), input, textarea, select, a[href], [tabindex]:not([tabindex="-1"])');
     if (!f.length) {
       return;
     }
@@ -583,31 +526,6 @@
   document.addEventListener('keydown', trapFocus);
 
   // --- Explain panel --------------------------------------------------------
-  function explainContent(state) {
-    const a = state.answer;
-    let body = '';
-
-    if (a) {
-      body += answerBlock(a, state);
-    } else if (!state.activeFile) {
-      return emptyState(
-        'Understand this selection',
-        'Explanations are grounded in your real files — every claim links back to the exact line so you can verify it in one click.',
-      );
-    } else if (state.explanation) {
-      body += `<div class="explanation">${esc(state.explanation)}</div>`;
-    } else {
-      return emptyState(
-        'Understand this selection',
-        'Highlight code in the editor, then Explain — or ask a question below.',
-      );
-    }
-
-    body += whatsMissing(state);
-    body += diagnostics(state);
-    return body;
-  }
-
   function answerBlock(a, state) {
     let body =
       '<div class="answer-head"><span class="answer-kicker">' +
@@ -622,8 +540,7 @@
       body +=
         '<div class="streaming-row"><span class="streaming-dots" aria-hidden="true">' +
         '<span></span><span></span><span></span></span>' +
-        '<span class="muted">Claude is answering…</span>' +
-        '<button type="button" class="btn" data-action="cancel">Stop</button></div>';
+        '<span class="muted">Claude is answering…</span></div>';
     } else if (a.verify) {
       const v = a.verify;
       body += `<p class="check-summary">Limited check: <strong>${v.grounded}</strong> grounded · <strong>${v.unverified}</strong> unverified</p>`;
@@ -642,49 +559,6 @@
       }
     }
     return body;
-  }
-
-  function whatsMissing(state) {
-    const gaps = state.contextGaps || [];
-    if (!gaps.length) {
-      return '';
-    }
-    const items = gaps.map((g) => `<li>${esc(g)}</li>`).join('');
-    return (
-      '<section class="card card-warn" aria-label="What is missing from the context">' +
-      "<h2>⚠ What's missing</h2>" +
-      '<p class="muted">The answer above was built with less than full context. Keep that in mind.</p>' +
-      `<ul>${items}</ul></section>`
-    );
-  }
-
-  // Secondary detail, tucked into a disclosure to keep the surface calm.
-  function diagnostics(state) {
-    const parts = [];
-    // The exact outbound prompt is reviewed in the native pre-send modal and
-    // remains available afterward through "Review last prompt."
-    const items = state.retrieved || [];
-    if (items.length) {
-      const rows = items
-        .map((r) => `<li><strong>${esc(r.sourceType)}</strong> ${esc(r.path)}<br /><span class="muted">${esc(r.reasonIncluded)}</span></li>`)
-        .join('');
-      parts.push(card('Retrieved context', `<ul>${rows}</ul>`));
-    }
-    const links = state.docs || [];
-    if (links.length) {
-      const rows = links
-        .map((l) => `<li><a href="#" data-url="${esc(l.url)}">${esc(l.title)}</a><br /><span class="muted">${esc(l.reason)}</span></li>`)
-        .join('');
-      parts.push(card('Docs &amp; learning', `<ul class="links">${rows}</ul>`));
-    }
-    if (!parts.length) {
-      return '';
-    }
-    return (
-      '<details class="diagnostics"><summary class="muted">Details — packet, retrieval, docs</summary>' +
-      parts.join('') +
-      '</details>'
-    );
   }
 
   // --- Facts rail -----------------------------------------------------------
@@ -822,10 +696,7 @@
       '</div>' +
       '<p class="tour-hint">← → also step through — every action has a button.</p>';
 
-    const answer = answerWindow(
-      state,
-      'Press “Explain this step” to see a grounded explanation of this file here.',
-    );
+    const answer = '<p class="muted">Explain this step opens the prepared Explain workspace. Your Tour position is kept.</p>';
 
     return head + stepCard + controls + answer;
   }
@@ -851,6 +722,7 @@
         ? esc(result.note)
         : 'No checkable claims were detected. The prose remains unchecked.';
       els.checkResults.innerHTML = `<p class="muted">${note}</p>`;
+      announce('Check complete: no checkable claims.');
       return;
     }
     const summary =
@@ -860,11 +732,31 @@
       .map((c) => claimItem(c, c.status === 'grounded' ? okBadge : warnBadge))
       .join('');
     els.checkResults.innerHTML = `${summary}<p class="muted">${esc(result.note)}</p><ul class="claims">${items}</ul>`;
+    announce(`Check complete: ${result.grounded} grounded, ${result.unverified} unverified.`);
+  }
+
+  // Rebuilding markup destroys the focused control; put focus back on the
+  // same command/link (or its panel) so keyboard users keep their place.
+  function updateHtml(element, html) {
+    if (element.dataset.rendered === html) {
+      return;
+    }
+    const focused = element.contains(document.activeElement) ? document.activeElement : null;
+    const key = focused && (focused.dataset.command || focused.dataset.path);
+    element.innerHTML = html;
+    element.dataset.rendered = html;
+    if (!focused) {
+      return;
+    }
+    const same = Array.from(element.querySelectorAll('[data-command], [data-path]'))
+      .find((e) => !e.disabled && (e.dataset.command || e.dataset.path) === key);
+    const fallback = element.closest('[role="tabpanel"]');
+    (same || fallback)?.focus({ preventScroll: true });
   }
 
   // --- Shared helpers -------------------------------------------------------
-  const okBadge = '<span class="badge ok" aria-label="grounded">✓</span>';
-  const warnBadge = '<span class="badge warn" aria-label="unverified">⚠</span>';
+  const okBadge = '<span class="badge ok"><span aria-hidden="true">✓</span><span class="sr-only">Grounded:</span></span>';
+  const warnBadge = '<span class="badge warn"><span aria-hidden="true">⚠</span><span class="sr-only">Unverified:</span></span>';
 
   function claimItem(c, badge) {
     const src = c.location ? `<div class="claim-src">${sourceLink(c.location)}</div>` : '';
@@ -910,10 +802,6 @@
       '</svg></span>' +
       `<h2>${esc(title)}</h2><p>${esc(sub)}</p>${extra || ''}</div>`
     );
-  }
-
-  function card(title, inner) {
-    return `<section class="card"><h2>${title}</h2>${inner}</section>`;
   }
 
   function esc(value) {

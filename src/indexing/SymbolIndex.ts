@@ -59,14 +59,11 @@ export class SymbolIndex implements SymbolIndexService {
 
   constructor(
     private readonly logger: Logger,
-    private readonly store?: LocalStore,
+    private readonly store: LocalStore,
   ) {}
 
-  /** Load persisted symbols from the store, if any. */
+  /** Load persisted symbols from the store. */
   async load(): Promise<void> {
-    if (!this.store) {
-      return;
-    }
     try {
       await this.store.init();
       const rows = await this.store.all<FileSymbols>(STORE_TABLE);
@@ -113,17 +110,20 @@ export class SymbolIndex implements SymbolIndexService {
       const document = await vscode.workspace.openTextDocument(
         vscode.Uri.file(fileId),
       );
+      const version = document.version;
+      const lines = document.getText().split('\n');
       const tree = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
         'vscode.executeDocumentSymbolProvider',
         document.uri,
       );
+      if (document.version !== version) { this.files.delete(fileId); return false; }
       const rawSymbols = toSymbolRecords(
         (tree ?? []).map(toDocSymbolLike),
         fileId,
-        document.getText().split('\n'),
+        lines,
         document.languageId,
       );
-      const symbols = rawSymbols.map(sanitizeSymbol);
+      const symbols = rawSymbols.map(symbol => ({ ...sanitizeSymbol(symbol), version }));
       this.files.set(fileId, { id: fileId, hash, symbols });
       return true;
     } catch (err) {
@@ -212,9 +212,6 @@ export class SymbolIndex implements SymbolIndexService {
 
   /** Persist all symbols to the store. Best-effort. */
   private async persist(): Promise<void> {
-    if (!this.store) {
-      return;
-    }
     try {
       await this.store.replaceTable(STORE_TABLE, [...this.files.values()]);
     } catch (err) {

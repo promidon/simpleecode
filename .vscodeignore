@@ -13,6 +13,10 @@ tsconfig.json
 **/*.ts
 node_modules/**
 out/test/**
+out/integration/**
+tests/**
+test-results/**
+playwright-report/**
 docs/**
 .fallow/**
 .fallowrc.json
